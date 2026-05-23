@@ -3,8 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StaffDetailScreen } from '@/src/screens/staff/StaffDetailScreen';
 import { StaffScreen } from '@/src/screens/staff/StaffScreen';
 
+export type StaffListParams = {
+  /** Pre-applied status filter, e.g. `active` from Dashboard */
+  status?: string;
+};
+
 export type StaffStackParamList = {
-  StaffList: undefined;
+  StaffList: StaffListParams | undefined;
   StaffDetail: { staffId: string };
 };
 

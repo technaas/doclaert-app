@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { AppScreenLayout } from '@/src/components/layout/AppScreenLayout';
 import { DocumentCard } from '@/src/components/documents/DocumentCard';
@@ -10,6 +10,8 @@ import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ErrorState } from '@/src/components/ui/ErrorState';
 import { ListRowSkeleton } from '@/src/components/ui/ListRowSkeleton';
 import { SearchInput } from '@/src/components/ui/SearchInput';
+import { EMPTY_STATES } from '@/src/constants/emptyStates';
+import { FLAT_LIST_PERF } from '@/src/constants/listConfig';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDocumentsData } from '@/src/hooks/useDocumentsData';
@@ -22,7 +24,7 @@ import {
 
 type Props = NativeStackScreenProps<DocumentsStackParamList, 'DocumentsList'>;
 
-export function DocumentsScreen({ navigation }: Props) {
+export function DocumentsScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
 
@@ -41,7 +43,18 @@ export function DocumentsScreen({ navigation }: Props) {
     retry,
   } = useDocumentsData(companyId);
 
-  const [filters, setFilters] = useState<DocumentFilters>(DEFAULT_DOCUMENT_FILTERS);
+  const routeStatus = route.params?.status;
+
+  const [filters, setFilters] = useState<DocumentFilters>(() => ({
+    ...DEFAULT_DOCUMENT_FILTERS,
+    ...(routeStatus ? { status: routeStatus } : {}),
+  }));
+
+  useEffect(() => {
+    if (routeStatus) {
+      setFilters((prev) => ({ ...prev, status: routeStatus }));
+    }
+  }, [routeStatus]);
 
   const allItems = useMemo(
     () =>
@@ -118,16 +131,13 @@ export function DocumentsScreen({ navigation }: Props) {
 
       {!loading && !error && filteredItems.length === 0 ? (
         <View style={styles.listPad}>
-          <EmptyState
-            title="No documents found"
-            message="Try another tab, adjust filters, or pull down to refresh."
-            icon="document-text-outline"
-          />
+          <EmptyState {...EMPTY_STATES.documents} />
         </View>
       ) : null}
 
       {!error && (documents.length > 0 || !loading) ? (
         <FlatList
+          {...FLAT_LIST_PERF}
           data={filteredItems}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listPad}

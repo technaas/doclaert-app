@@ -9,3 +9,10 @@ export type {
 } from './documents';
 export type { AlertFilters, AlertListItem, AlertUrgencyGroup } from './alerts';
 export type { Brand, Branch, StaffMember, StaffListItem, StaffDocument } from './staff';
+export type {
+  DeviceRegistrationInfo,
+  MobileDeviceRecord,
+  NotificationPermissionStatus,
+  NotificationPayload,
+  TokenSyncStatus,
+} from './notifications';

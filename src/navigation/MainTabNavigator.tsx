@@ -1,8 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { ComponentProps } from 'react';
 
-import { colors } from '@/src/constants/theme';
+import type { DocumentsStackParamList } from '@/src/navigation/DocumentsStack';
+import type { StaffStackParamList } from '@/src/navigation/StaffStack';
+
+import { colors, shadows } from '@/src/constants/theme';
 import { DocumentsStack } from '@/src/navigation/DocumentsStack';
 import { StaffStack } from '@/src/navigation/StaffStack';
 import { DashboardScreen } from '@/src/screens/DashboardScreen';
@@ -11,9 +15,9 @@ import { SettingsScreen } from '@/src/screens/SettingsScreen';
 
 export type MainTabParamList = {
   Dashboard: undefined;
-  Staff: undefined;
+  Staff: NavigatorScreenParams<StaffStackParamList>;
   Salary: undefined;
-  Documents: undefined;
+  Documents: NavigatorScreenParams<DocumentsStackParamList>;
   Settings: undefined;
 };
 
@@ -38,9 +42,10 @@ export function MainTabNavigator() {
         tabBarInactiveTintColor: colors.textSubtle,
         tabBarStyle: {
           backgroundColor: colors.background,
-          borderTopColor: colors.border,
-          paddingTop: 4,
-          height: 60,
+          borderTopColor: colors.borderLight,
+          paddingTop: 6,
+          height: 62,
+          ...shadows.cardSoft,
         },
         tabBarLabelStyle: {
           fontSize: 11,

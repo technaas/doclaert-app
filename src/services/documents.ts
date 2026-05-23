@@ -1,3 +1,4 @@
+import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import { supabase } from '@/src/lib/supabase';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
@@ -118,5 +119,5 @@ export async function fetchDocumentById(
 }
 
 export function getDocumentFileUrl(document: DocumentRecord | null | undefined): string | null {
-  return document?.file_url ?? null;
+  return resolveDocumentFileUrl(document?.file_url);
 }

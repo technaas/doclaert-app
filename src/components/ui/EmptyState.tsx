@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { cardStyle, colors, radius, spacing } from '@/src/constants/theme';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -19,7 +19,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <View style={styles.wrap}>
-      <Ionicons name={icon} size={40} color={colors.primary} />
+      <View style={styles.iconCircle}>
+        <Ionicons name={icon} size={28} color={colors.primary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
     </View>
@@ -28,17 +30,24 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   wrap: {
+    ...cardStyle,
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xxl,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xl,
     gap: spacing.sm,
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   title: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
   },
@@ -46,6 +55,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
+    maxWidth: 300,
   },
 });

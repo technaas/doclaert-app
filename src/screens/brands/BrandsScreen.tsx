@@ -8,6 +8,8 @@ import { ErrorState } from '@/src/components/ui/ErrorState';
 import { FilterSelect, type FilterOption } from '@/src/components/ui/FilterSelect';
 import { ListRowSkeleton } from '@/src/components/ui/ListRowSkeleton';
 import { SearchInput } from '@/src/components/ui/SearchInput';
+import { EMPTY_STATES } from '@/src/constants/emptyStates';
+import { FLAT_LIST_PERF } from '@/src/constants/listConfig';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCompanyOrgData } from '@/src/hooks/useCompanyOrgData';
@@ -73,16 +75,13 @@ export function BrandsScreen({ navigation }: Props) {
 
       {!loading && !error && brands.length === 0 ? (
         <View style={styles.pad}>
-          <EmptyState
-            title="No brands found"
-            message="Try adjusting search or filters, or pull down to refresh."
-            icon="business-outline"
-          />
+          <EmptyState {...EMPTY_STATES.brands} />
         </View>
       ) : null}
 
       {data && !error ? (
         <FlatList
+          {...FLAT_LIST_PERF}
           data={brands}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.pad}

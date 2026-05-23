@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,14 +10,16 @@ import {
   Text,
   View,
 } from 'react-native';
+
 import { AppScreenLayout } from '@/src/components/layout/AppScreenLayout';
 import { SummaryCard } from '@/src/components/dashboard/SummaryCard';
-import type { AppStackParamList } from '@/src/navigation/AppStack';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SummaryCardSkeleton } from '@/src/components/dashboard/SummaryCardSkeleton';
+import { cardStyle, colors, spacing, typography } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
-import { fetchDashboardStats } from '@/src/services/dashboard';
-import type { DashboardStats } from '@/src/types/dashboard';
+import { useDashboardQuery } from '@/src/hooks/queries/useDashboardQuery';
+import { getQueryScreenState } from '@/src/lib/queryScreenState';
+import type { AppStackParamList } from '@/src/navigation/AppStack';
+import type { MainTabParamList } from '@/src/navigation/MainTabNavigator';
 
 function formatPay(amount: number): string {
   return `KWD ${amount.toFixed(3)}`;
@@ -27,10 +29,16 @@ function formatCount(count: number): string {
   return count.toLocaleString();
 }
 
+type DashboardNavigation = BottomTabNavigationProp<MainTabParamList, 'Dashboard'> &
+  NativeStackNavigationProp<AppStackParamList>;
+
 export function DashboardScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const { user, profile, logout } = useAuth();
+  const navigation = useNavigation<DashboardNavigation>();
+  const { profile } = useAuth();
   const companyId = profile?.company_id;
+  const query = useDashboardQuery(companyId);
+  const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
+  const stats = query.data;
 
   const openAppScreen = (screen: 'Brands' | 'Branches') => {
     const parent = navigation.getParent();
@@ -41,67 +49,28 @@ export function DashboardScreen() {
     navigation.navigate(screen);
   };
 
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [logoutLoading, setLogoutLoading] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
-
-  const loadStats = useCallback(
-    async (isRefresh = false) => {
-      if (!companyId) {
-        setError('Company not found on your profile.');
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        const data = await fetchDashboardStats(companyId);
-        setStats(data);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load dashboard. Please try again.';
-        setError(message);
-        if (!isRefresh) {
-          setStats(null);
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [companyId],
-  );
-
-  useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
-
-  const handleLogout = async () => {
-    setLogoutError(null);
-    setLogoutLoading(true);
-
-    try {
-      await logout();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Logout failed. Please try again.';
-      setLogoutError(message);
-    } finally {
-      setLogoutLoading(false);
-    }
+  const openStaffActive = () => {
+    navigation.navigate('Staff', {
+      screen: 'StaffList',
+      params: { status: 'active' },
+    });
   };
 
+  const openSalary = () => {
+    navigation.navigate('Salary');
+  };
+
+  const openDocuments = (status: 'expiring' | 'expired') => {
+    navigation.navigate('Documents', {
+      screen: 'DocumentsList',
+      params: { status },
+    });
+  };
+
+  const error = companyId ? errorMessage : 'Company not found on your profile.';
+
   const isEmpty =
-    !loading &&
+    !isInitialLoading &&
     !error &&
     stats &&
     stats.brandsCount === 0 &&
@@ -121,40 +90,42 @@ export function DashboardScreen() {
     <AppScreenLayout title={greeting} subtitle={today}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void loadStats(true)}
-            tintColor="#2563EB"
-            colors={['#2563EB']}
+            refreshing={isRefreshing}
+            onRefresh={() => void query.refetch()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }>
-        {user?.email ? <Text style={styles.email}>{user.email}</Text> : null}
-
-        {loading && !stats ? (
-          <View style={styles.grid}>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <SummaryCardSkeleton key={index} />
-            ))}
+        {isInitialLoading ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Overview</Text>
+            <View style={styles.grid}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <SummaryCardSkeleton key={index} />
+              ))}
+            </View>
           </View>
         ) : null}
 
-        {error ? (
+        {error && !stats ? (
           <View style={styles.stateCard}>
-            <Ionicons name="alert-circle-outline" size={40} color="#DC2626" />
+            <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
             <Text style={styles.stateTitle}>Unable to load dashboard</Text>
             <Text style={styles.stateMessage}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={() => void loadStats()}>
+            <Pressable style={styles.retryButton} onPress={() => void query.refetch()}>
               <Text style={styles.retryButtonText}>Try again</Text>
             </Pressable>
           </View>
         ) : null}
 
-        {!loading && !error && stats ? (
+        {!error && stats ? (
           <>
             {isEmpty ? (
-              <View style={styles.stateCard}>
-                <Ionicons name="folder-open-outline" size={40} color="#2563EB" />
+              <View style={[styles.stateCard, styles.stateCardFirst]}>
+                <Ionicons name="folder-open-outline" size={40} color={colors.primary} />
                 <Text style={styles.stateTitle}>No data yet</Text>
                 <Text style={styles.stateMessage}>
                   Your company has no brands, branches, staff, or documents yet. Pull down to
@@ -163,61 +134,67 @@ export function DashboardScreen() {
               </View>
             ) : null}
 
-            <View style={styles.grid}>
-              <SummaryCard
-                label="Brands"
-                value={formatCount(stats.brandsCount)}
-                icon="business-outline"
-                onPress={() => openAppScreen('Brands')}
-              />
-              <SummaryCard
-                label="Branches"
-                value={formatCount(stats.branchesCount)}
-                icon="location-outline"
-                onPress={() => openAppScreen('Branches')}
-              />
-              <SummaryCard
-                label="Active Staff"
-                value={formatCount(stats.activeStaffCount)}
-                icon="people-outline"
-                tone="success"
-              />
-              <SummaryCard
-                label="Total Pay"
-                value={formatPay(stats.totalPay)}
-                icon="wallet-outline"
-                subtitle="Active staff salaries"
-              />
-              <SummaryCard
-                label="Expiring Soon"
-                value={formatCount(stats.expiringSoonCount)}
-                icon="time-outline"
-                tone="warning"
-                subtitle={`Within ${stats.alertThresholdDays} days`}
-              />
-              <SummaryCard
-                label="Expired"
-                value={formatCount(stats.expiredCount)}
-                icon="close-circle-outline"
-                tone="danger"
-                subtitle="Past expiry date"
-              />
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Organization</Text>
+              <View style={styles.grid}>
+                <SummaryCard
+                  label="Brands"
+                  value={formatCount(stats.brandsCount)}
+                  icon="business-outline"
+                  onPress={() => openAppScreen('Brands')}
+                />
+                <SummaryCard
+                  label="Branches"
+                  value={formatCount(stats.branchesCount)}
+                  icon="location-outline"
+                  onPress={() => openAppScreen('Branches')}
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>People & payroll</Text>
+              <View style={styles.grid}>
+                <SummaryCard
+                  label="Active Staff"
+                  value={formatCount(stats.activeStaffCount)}
+                  icon="people-outline"
+                  tone="success"
+                  onPress={openStaffActive}
+                />
+                <SummaryCard
+                  label="Total Pay"
+                  value={formatPay(stats.totalPay)}
+                  icon="wallet-outline"
+                  subtitle="Active staff salaries"
+                  onPress={openSalary}
+                />
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Document alerts</Text>
+              <View style={styles.grid}>
+                <SummaryCard
+                  label="Expiring Soon"
+                  value={formatCount(stats.expiringSoonCount)}
+                  icon="time-outline"
+                  tone="warning"
+                  subtitle={`Within ${stats.alertThresholdDays} days`}
+                  onPress={() => openDocuments('expiring')}
+                />
+                <SummaryCard
+                  label="Expired"
+                  value={formatCount(stats.expiredCount)}
+                  icon="close-circle-outline"
+                  tone="danger"
+                  subtitle="Past expiry date"
+                  onPress={() => openDocuments('expired')}
+                />
+              </View>
             </View>
           </>
         ) : null}
-
-        {logoutError ? <Text style={styles.logoutError}>{logoutError}</Text> : null}
-
-        <Pressable
-          style={[styles.logoutButton, logoutLoading && styles.logoutButtonDisabled]}
-          onPress={handleLogout}
-          disabled={logoutLoading || loading}>
-          {logoutLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          )}
-        </Pressable>
       </ScrollView>
     </AppScreenLayout>
   );
@@ -225,76 +202,55 @@ export function DashboardScreen() {
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    paddingTop: spacing.xs,
   },
-  email: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginBottom: 16,
+  section: {
+    marginBottom: spacing.lg,
+  },
+  sectionLabel: {
+    ...typography.label,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    gap: spacing.md,
   },
   stateCard: {
+    ...cardStyle,
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 24,
-    marginBottom: 20,
-    gap: 8,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  stateCardFirst: {
+    marginBottom: spacing.md,
   },
   stateTitle: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '700',
+    color: colors.text,
     textAlign: 'center',
   },
   stateMessage: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
   },
   retryButton: {
-    marginTop: 8,
-    backgroundColor: '#2563EB',
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
     borderRadius: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
     paddingVertical: 10,
   },
   retryButtonText: {
-    color: '#FFFFFF',
+    color: colors.background,
     fontSize: 14,
     fontWeight: '600',
-  },
-  logoutButton: {
-    marginTop: 'auto',
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  logoutButtonDisabled: {
-    opacity: 0.7,
-  },
-  logoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  logoutError: {
-    color: '#DC2626',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 12,
   },
 });

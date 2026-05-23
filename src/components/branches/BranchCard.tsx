@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -11,7 +12,7 @@ type BranchCardProps = {
   onPress: () => void;
 };
 
-export function BranchCard({ branch, onPress }: BranchCardProps) {
+function BranchCardComponent({ branch, onPress }: BranchCardProps) {
   const statusTone =
     (branch.status ?? '') === 'active'
       ? 'success'
@@ -109,3 +110,5 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
 });
+
+export const BranchCard = memo(BranchCardComponent);

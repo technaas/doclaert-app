@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -17,7 +18,7 @@ type AlertCardProps = {
   onPress: () => void;
 };
 
-export function AlertCard({ alert, onPress }: AlertCardProps) {
+function AlertCardComponent({ alert, onPress }: AlertCardProps) {
   const tone = getAlertCardTone(alert.displayStatus, alert.daysRemaining);
   const statusLabel = getAlertStatusLabel(alert.displayStatus, alert.daysRemaining);
 
@@ -118,3 +119,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+export const AlertCard = memo(AlertCardComponent);

@@ -1,8 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,8 @@ import {
 import { getDocumentLabel } from '@/src/constants/documents';
 import { colors, radius, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
+import { useDocumentDetailData } from '@/src/hooks/useDocumentDetailData';
+import { DocumentImagePreviewModal } from '@/src/components/documents/DocumentImagePreviewModal';
 import { DetailRow } from '@/src/components/ui/DetailRow';
 import { ErrorState } from '@/src/components/ui/ErrorState';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -22,14 +23,10 @@ import {
   getDocumentDisplayStatus,
   statusBadgeTone,
 } from '@/src/lib/documentStatus';
+import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import { daysUntilExpiry } from '@/src/lib/expiry';
+import { openDocumentFile, openUrlInBrowser } from '@/src/lib/openDocumentFile';
 import type { DocumentsStackParamList } from '@/src/navigation/DocumentsStack';
-import {
-  fetchCompanyDocumentsData,
-  fetchDocumentById,
-  getDocumentFileUrl,
-} from '@/src/services/documents';
-import type { DocumentRecord } from '@/src/types/documents';
 
 type Props = NativeStackScreenProps<DocumentsStackParamList, 'DocumentDetail'>;
 
@@ -38,99 +35,88 @@ export function DocumentDetailScreen({ route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
 
-  const [document, setDocument] = useState<DocumentRecord | null>(null);
-  const [linkedTo, setLinkedTo] = useState('—');
-  const [brandName, setBrandName] = useState('—');
-  const [branchName, setBranchName] = useState('—');
-  const [staffInfo, setStaffInfo] = useState<string | null>(null);
-  const [thresholdDays, setThresholdDays] = useState(30);
-  const [documentFileUrl, setDocumentFileUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    document,
+    linkedTo,
+    brandName,
+    branchName,
+    staffInfo,
+    thresholdDays,
+    documentFileUrl,
+    loading,
+    error,
+    retry,
+  } = useDocumentDetailData(companyId, documentId);
+
   const [openingFile, setOpeningFile] = useState(false);
   const [fileOpenError, setFileOpenError] = useState<string | null>(null);
+  const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!companyId) {
-      setError('Company not found.');
-      setLoading(false);
+  const handleOpenInBrowser = async () => {
+    const url = resolveDocumentFileUrl(documentFileUrl);
+    if (!url) {
+      setFileOpenError('Invalid document URL.');
       return;
     }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [lookups, doc] = await Promise.all([
-        fetchCompanyDocumentsData(companyId),
-        fetchDocumentById(companyId, documentId),
-      ]);
-
-      if (!doc) {
-        setError('Document not found.');
-        setDocument(null);
-        return;
-      }
-
-      setDocument(doc);
-      setThresholdDays(lookups.alertThresholdDays);
-
-      const brandMap = new Map(lookups.brands.map((b) => [b.id, b.name]));
-      const staffMap = new Map(lookups.staff.map((s) => [s.id, s]));
-
-      if (doc.type === 'staff' && doc.staff_id) {
-        const staff = staffMap.get(doc.staff_id);
-        const branch = staff ? lookups.branches.find((b) => b.id === staff.branch_id) : undefined;
-        const brandId = branch?.brand_id ?? staff?.brand_id;
-        setLinkedTo(staff?.name ?? '—');
-        setStaffInfo(
-          [staff?.role, staff?.staff_id ? `ID: ${staff.staff_id}` : null]
-            .filter(Boolean)
-            .join(' · ') || null,
-        );
-        setBranchName(branch?.name ?? '—');
-        setBrandName(brandId ? (brandMap.get(brandId) ?? '—') : '—');
-      } else if (doc.type === 'branch' && doc.branch_id) {
-        const branch = lookups.branches.find((b) => b.id === doc.branch_id);
-        setLinkedTo(branch?.name ?? '—');
-        setStaffInfo(null);
-        setBranchName(branch?.name ?? '—');
-        setBrandName(branch ? (brandMap.get(branch.brand_id) ?? '—') : '—');
-      }
-
-      setDocumentFileUrl(getDocumentFileUrl(doc));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load document details.');
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId, documentId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleOpenFile = async () => {
-    if (!documentFileUrl) return;
 
     setFileOpenError(null);
     setOpeningFile(true);
 
     try {
-      const supported = await Linking.canOpenURL(documentFileUrl);
-      if (!supported) {
-        setFileOpenError('Unable to open this file link.');
-        return;
-      }
-      await Linking.openURL(documentFileUrl);
-    } catch {
-      setFileOpenError('Failed to open file.');
+      await openUrlInBrowser(url);
+    } catch (err) {
+      setFileOpenError(
+        err instanceof Error ? err.message : 'Failed to open in browser.',
+      );
     } finally {
       setOpeningFile(false);
     }
   };
 
-  if (loading) {
+  const handleViewDocument = async () => {
+    const url = resolveDocumentFileUrl(documentFileUrl);
+    if (!url) {
+      setFileOpenError('Invalid document URL.');
+      return;
+    }
+
+    setFileOpenError(null);
+    setOpeningFile(true);
+
+    try {
+      const result = await openDocumentFile(url);
+
+      if (result.action === 'image-preview') {
+        setImagePreviewUrl(result.url);
+        setImagePreviewVisible(true);
+        return;
+      }
+
+      if (result.action === 'failed') {
+        setFileOpenError(result.message);
+      }
+    } catch (err) {
+      setFileOpenError(
+        err instanceof Error ? err.message : 'Failed to open document.',
+      );
+    } finally {
+      setOpeningFile(false);
+    }
+  };
+
+  const handleImagePreviewError = (message: string) => {
+    setImagePreviewVisible(false);
+    setImagePreviewUrl(null);
+    setFileOpenError(message);
+  };
+
+  const handleCloseImagePreview = () => {
+    setImagePreviewVisible(false);
+    setImagePreviewUrl(null);
+  };
+
+  if (loading && !document) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -141,7 +127,7 @@ export function DocumentDetailScreen({ route }: Props) {
   if (error || !document) {
     return (
       <View style={styles.centeredPad}>
-        <ErrorState message={error ?? 'Document not found.'} onRetry={() => void load()} />
+        <ErrorState message={error ?? 'Document not found.'} onRetry={() => void retry()} />
       </View>
     );
   }
@@ -149,7 +135,10 @@ export function DocumentDetailScreen({ route }: Props) {
   const displayStatus = getDocumentDisplayStatus(document.expiry_date, thresholdDays);
   const days = document.expiry_date ? daysUntilExpiry(document.expiry_date) : null;
 
+  const documentTitle = getDocumentLabel(document.document_name);
+
   return (
+    <>
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Document</Text>
@@ -189,13 +178,25 @@ export function DocumentDetailScreen({ route }: Props) {
           <>
             <Pressable
               style={[styles.fileButton, openingFile && styles.fileButtonDisabled]}
-              onPress={handleOpenFile}
+              onPress={() => void handleViewDocument()}
               disabled={openingFile}>
-              <Text style={styles.fileButtonText}>
-                {openingFile ? 'Opening…' : 'View Document'}
-              </Text>
+              {openingFile ? (
+                <ActivityIndicator color={colors.background} size="small" />
+              ) : (
+                <Text style={styles.fileButtonText}>View Document</Text>
+              )}
             </Pressable>
-            {fileOpenError ? <Text style={styles.fileError}>{fileOpenError}</Text> : null}
+            {fileOpenError ? (
+              <>
+                <Text style={styles.fileError}>{fileOpenError}</Text>
+                <Pressable
+                  style={[styles.secondaryButton, openingFile && styles.fileButtonDisabled]}
+                  onPress={() => void handleOpenInBrowser()}
+                  disabled={openingFile}>
+                  <Text style={styles.secondaryButtonText}>Open in Browser</Text>
+                </Pressable>
+              </>
+            ) : null}
           </>
         ) : (
           <Text style={styles.noFile}>No file uploaded</Text>
@@ -208,6 +209,18 @@ export function DocumentDetailScreen({ route }: Props) {
         ) : null}
       </View>
     </ScrollView>
+
+    {imagePreviewUrl ? (
+      <DocumentImagePreviewModal
+        visible={imagePreviewVisible}
+        uri={imagePreviewUrl}
+        title={documentTitle}
+        onClose={handleCloseImagePreview}
+        onError={handleImagePreviewError}
+        onOpenInBrowser={() => void handleOpenInBrowser()}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -278,7 +291,21 @@ const styles = StyleSheet.create({
   fileError: {
     fontSize: 13,
     color: colors.danger,
+    marginBottom: spacing.sm,
+  },
+  secondaryButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
     marginBottom: spacing.md,
+    backgroundColor: colors.background,
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
   },
   notesBox: {
     backgroundColor: colors.background,

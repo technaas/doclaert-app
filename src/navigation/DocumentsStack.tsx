@@ -3,8 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { DocumentDetailScreen } from '@/src/screens/documents/DocumentDetailScreen';
 import { DocumentsScreen } from '@/src/screens/documents/DocumentsScreen';
 
+export type DocumentsListParams = {
+  /** Pre-applied status filter: `expiring` | `expired` from Dashboard */
+  status?: string;
+};
+
 export type DocumentsStackParamList = {
-  DocumentsList: undefined;
+  DocumentsList: DocumentsListParams | undefined;
   DocumentDetail: { documentId: string };
 };
 

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { colors, radius, shadows, spacing } from '@/src/constants/theme';
 
 type SearchInputProps = {
   value: string;
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: spacing.md,
     minHeight: 44,
+    ...shadows.cardSoft,
   },
   input: {
     flex: 1,

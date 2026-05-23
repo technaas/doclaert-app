@@ -71,8 +71,18 @@ export function SummaryCard({
     <>
       <View style={styles.header}>
         <Text style={[styles.label, { color: toneStyle.labelColor }]}>{label}</Text>
-        <View style={[styles.iconWrap, { backgroundColor: toneStyle.iconBg }]}>
-          <Ionicons name={icon} size={20} color={toneStyle.iconColor} />
+        <View style={styles.headerRight}>
+          <View style={[styles.iconWrap, { backgroundColor: toneStyle.iconBg }]}>
+            <Ionicons name={icon} size={20} color={toneStyle.iconColor} />
+          </View>
+          {onPress ? (
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={toneStyle.labelColor}
+              style={styles.chevron}
+            />
+          ) : null}
         </View>
       </View>
       <Text style={[styles.value, { color: toneStyle.valueColor }]}>{value}</Text>
@@ -127,6 +137,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chevron: {
+    opacity: 0.55,
   },
   label: {
     flex: 1,

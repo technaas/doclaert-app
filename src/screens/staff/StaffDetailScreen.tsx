@@ -1,5 +1,4 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -15,6 +14,7 @@ import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { getDocumentLabel } from '@/src/constants/documents';
 import { colors, radius, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
+import { useStaffDetailData } from '@/src/hooks/useStaffDetailData';
 import {
   computeStatus,
   daysUntilExpiry,
@@ -24,12 +24,6 @@ import {
 import { formatPay } from '@/src/lib/format';
 import { isPartTimeType } from '@/src/lib/staffFilters';
 import type { StaffStackParamList } from '@/src/navigation/StaffStack';
-import {
-  fetchCompanyStaffData,
-  fetchStaffDocuments,
-  fetchStaffMember,
-} from '@/src/services/staff';
-import type { StaffDocument, StaffMember } from '@/src/types/staff';
 
 type Props = NativeStackScreenProps<StaffStackParamList, 'StaffDetail'>;
 
@@ -44,63 +38,18 @@ export function StaffDetailScreen({ route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
 
-  const [staff, setStaff] = useState<StaffMember | null>(null);
-  const [documents, setDocuments] = useState<StaffDocument[]>([]);
-  const [brandMap, setBrandMap] = useState<Map<string, string>>(new Map());
-  const [branchMap, setBranchMap] = useState<Map<string, string>>(new Map());
-  const [branchToBrandId, setBranchToBrandId] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    staff,
+    documents,
+    brandMap,
+    branchMap,
+    branchToBrandId,
+    loading,
+    error,
+    retry,
+  } = useStaffDetailData(companyId, staffId);
 
-  const load = useCallback(async () => {
-    if (!companyId) {
-      setError('Company not found.');
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [lookups, member, docs] = await Promise.all([
-        fetchCompanyStaffData(companyId),
-        fetchStaffMember(companyId, staffId),
-        fetchStaffDocuments(companyId, staffId),
-      ]);
-
-      const nextBrandMap = new Map<string, string>();
-      lookups.brands.forEach((b) => nextBrandMap.set(b.id, b.name));
-      const nextBranchMap = new Map<string, string>();
-      const nextBranchToBrand = new Map<string, string>();
-      lookups.branches.forEach((b) => {
-        nextBranchMap.set(b.id, b.name);
-        nextBranchToBrand.set(b.id, b.brand_id);
-      });
-      setBrandMap(nextBrandMap);
-      setBranchMap(nextBranchMap);
-      setBranchToBrandId(nextBranchToBrand);
-
-      if (!member) {
-        setError('Staff member not found.');
-        setStaff(null);
-        setDocuments([]);
-      } else {
-        setStaff(member);
-        setDocuments(docs);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load staff details.');
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId, staffId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (loading) {
+  if (loading && !staff) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -111,7 +60,7 @@ export function StaffDetailScreen({ route }: Props) {
   if (error || !staff) {
     return (
       <View style={styles.centeredPad}>
-        <ErrorState message={error ?? 'Staff not found.'} onRetry={() => void load()} />
+        <ErrorState message={error ?? 'Staff not found.'} onRetry={() => void retry()} />
       </View>
     );
   }

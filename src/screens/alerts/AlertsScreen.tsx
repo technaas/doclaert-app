@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -14,95 +14,78 @@ import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ErrorState } from '@/src/components/ui/ErrorState';
 import { ListRowSkeleton } from '@/src/components/ui/ListRowSkeleton';
 import { SearchInput } from '@/src/components/ui/SearchInput';
+import { EMPTY_STATES } from '@/src/constants/emptyStates';
 import { colors, spacing } from '@/src/constants/theme';
-import { useAlertBadge } from '@/src/context/AlertBadgeContext';
 import { useAuth } from '@/src/context/AuthContext';
+import { useDocumentsData } from '@/src/hooks/useDocumentsData';
 import { buildAlertListItems, filterAlertList } from '@/src/lib/alertFilters';
 import { EXPIRING_GROUP_ORDER, URGENCY_GROUP_LABELS } from '@/src/lib/alertUrgency';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
-import { fetchCompanyDocumentsData } from '@/src/services/documents';
 import type { AlertFilters, AlertListItem, AlertUrgencyGroup } from '@/src/types/alerts';
 import { DEFAULT_ALERT_FILTERS } from '@/src/types/alerts';
-import type { Branch, Brand, StaffMember } from '@/src/types/staff';
-import type { DocumentRecord } from '@/src/types/documents';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Alerts'>;
 
-export function AlertsScreen({ navigation }: Props) {
+function filtersFromRouteParams(
+  params: AppStackParamList['Alerts'],
+): Partial<AlertFilters> | null {
+  if (!params) {
+    return null;
+  }
+
+  const patch: Partial<AlertFilters> = {};
+  if (params.tab && params.tab !== 'all') {
+    patch.tab = params.tab;
+  }
+  if (params.status && params.status !== 'all') {
+    patch.status = params.status;
+  }
+
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+export function AlertsScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
-  const { refresh: refreshBadge } = useAlertBadge();
+  const {
+    documents,
+    brands,
+    branches,
+    staffById,
+    branchById,
+    brandById,
+    alertThresholdDays: thresholdDays,
+    loading,
+    refreshing,
+    error,
+    refresh,
+    retry,
+  } = useDocumentsData(companyId);
 
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [thresholdDays, setThresholdDays] = useState(30);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<AlertFilters>(DEFAULT_ALERT_FILTERS);
+  const [filters, setFilters] = useState<AlertFilters>(() => {
+    const fromRoute = filtersFromRouteParams(route.params);
+    return fromRoute ? { ...DEFAULT_ALERT_FILTERS, ...fromRoute } : DEFAULT_ALERT_FILTERS;
+  });
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!companyId) {
-        setError('Company not found on your profile.');
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        const data = await fetchCompanyDocumentsData(companyId);
-        setDocuments(data.documents);
-        setBrands(data.brands);
-        setBranches(data.branches);
-        setStaff(data.staff);
-        setThresholdDays(data.alertThresholdDays);
-        await refreshBadge();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load alerts. Please try again.';
-        setError(message);
-        if (!isRefresh) {
-          setDocuments([]);
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [companyId, refreshBadge],
-  );
+  const lastAppliedRouteKey = useRef<string | null>(null);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const tab = route.params?.tab ?? 'all';
+    const status = route.params?.status ?? 'all';
+    const routeKey = `${tab}|${status}`;
+    if (routeKey === lastAppliedRouteKey.current) {
+      return;
+    }
+    lastAppliedRouteKey.current = routeKey;
 
-  const staffById = useMemo(() => {
-    const map = new Map<string, StaffMember>();
-    staff.forEach((s) => map.set(s.id, s));
-    return map;
-  }, [staff]);
+    const fromRoute = filtersFromRouteParams(route.params);
+    if (!fromRoute) {
+      return;
+    }
 
-  const branchById = useMemo(() => {
-    const map = new Map<string, Branch>();
-    branches.forEach((b) => map.set(b.id, b));
-    return map;
-  }, [branches]);
-
-  const brandById = useMemo(() => {
-    const map = new Map<string, Brand>();
-    brands.forEach((b) => map.set(b.id, b));
-    return map;
-  }, [brands]);
+    console.log('[DocAlert push] Alerts screen applying route filters', fromRoute);
+    setFilters((prev) => ({ ...prev, ...fromRoute }));
+  }, [route.params?.tab, route.params?.status]);
 
   const allAlerts = useMemo(
     () =>
@@ -175,17 +158,13 @@ export function AlertsScreen({ navigation }: Props) {
 
       {error && documents.length === 0 ? (
         <View style={styles.listPad}>
-          <ErrorState message={error} onRetry={() => void load()} />
+          <ErrorState message={error} onRetry={() => void retry()} />
         </View>
       ) : null}
 
       {!loading && !error && filteredAlerts.length === 0 ? (
         <View style={styles.listPad}>
-          <EmptyState
-            title="No alerts found"
-            message="All documents are within their expiry threshold, or try adjusting filters."
-            icon="notifications-outline"
-          />
+          <EmptyState {...EMPTY_STATES.alerts} />
         </View>
       ) : null}
 
@@ -195,7 +174,7 @@ export function AlertsScreen({ navigation }: Props) {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => void load(true)}
+              onRefresh={() => void refresh()}
               tintColor={colors.primary}
               colors={[colors.primary]}
             />

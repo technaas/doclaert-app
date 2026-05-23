@@ -1,57 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
-import { fetchCompanyStaffData } from '@/src/services/staff';
+import { useCompanyStaffQuery } from '@/src/hooks/queries/useCompanyStaffQuery';
+import { getQueryScreenState } from '@/src/lib/queryScreenState';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
 
+const EMPTY_BRANDS: Brand[] = [];
+const EMPTY_BRANCHES: Branch[] = [];
+const EMPTY_STAFF: StaffMember[] = [];
+
 export function useCompanyStaffData(companyId: string | undefined) {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useCompanyStaffQuery(companyId);
+  const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
+  const data = query.data;
 
-  const load = useCallback(
-    async (isRefresh = false) => {
-      if (!companyId) {
-        setError('Company not found on your profile.');
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      try {
-        const data = await fetchCompanyStaffData(companyId);
-        setBrands(data.brands);
-        setBranches(data.branches);
-        setStaff(data.staff);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load staff data. Please try again.';
-        setError(message);
-        if (!isRefresh) {
-          setBrands([]);
-          setBranches([]);
-          setStaff([]);
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [companyId],
-  );
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const brands = data?.brands ?? EMPTY_BRANDS;
+  const branches = data?.branches ?? EMPTY_BRANCHES;
+  const staff = data?.staff ?? EMPTY_STAFF;
 
   const brandMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -87,10 +51,10 @@ export function useCompanyStaffData(companyId: string | undefined) {
     branchMap,
     branchToBrandId,
     roles,
-    loading,
-    refreshing,
-    error,
-    refresh: () => load(true),
-    retry: () => load(false),
+    loading: isInitialLoading,
+    refreshing: isRefreshing,
+    error: companyId ? errorMessage : 'Company not found on your profile.',
+    refresh: () => query.refetch(),
+    retry: () => query.refetch(),
   };
 }

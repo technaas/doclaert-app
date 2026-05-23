@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -12,7 +13,7 @@ type StaffCardProps = {
   onPress: () => void;
 };
 
-export function StaffCard({ staff, onPress }: StaffCardProps) {
+function StaffCardComponent({ staff, onPress }: StaffCardProps) {
   const showPartTime = isPartTimeType(staff.staff_type);
   const statusTone =
     (staff.status ?? '') === 'active'
@@ -117,3 +118,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+export const StaffCard = memo(StaffCardComponent);

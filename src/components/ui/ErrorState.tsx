@@ -1,27 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { getFriendlyErrorPresentation } from '@/src/lib/errors';
+import { cardStyle, colors, radius, spacing } from '@/src/constants/theme';
 
 type ErrorStateProps = {
   title?: string;
   message: string;
   onRetry?: () => void;
+  retryLabel?: string;
 };
 
 export function ErrorState({
-  title = 'Something went wrong',
+  title,
   message,
   onRetry,
+  retryLabel = 'Try again',
 }: ErrorStateProps) {
+  const presentation = getFriendlyErrorPresentation(message, title);
+  const iconName = presentation.isNetwork ? 'cloud-offline-outline' : 'alert-circle-outline';
+  const iconColor = presentation.isNetwork ? colors.primary : colors.danger;
+
   return (
     <View style={styles.wrap}>
-      <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+      <View style={[styles.iconCircle, presentation.isNetwork && styles.iconCircleNetwork]}>
+        <Ionicons name={iconName} size={28} color={iconColor} />
+      </View>
+      <Text style={styles.title}>{title ?? presentation.title}</Text>
+      <Text style={styles.message}>{presentation.message}</Text>
       {onRetry ? (
-        <Pressable style={styles.button} onPress={onRetry}>
-          <Text style={styles.buttonText}>Try again</Text>
+        <Pressable
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel={retryLabel}>
+          <Text style={styles.buttonText}>{retryLabel}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -30,17 +43,27 @@ export function ErrorState({
 
 const styles = StyleSheet.create({
   wrap: {
+    ...cardStyle,
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xxl,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xl,
     gap: spacing.sm,
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.dangerLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  iconCircleNetwork: {
+    backgroundColor: colors.primaryLight,
   },
   title: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
   },
@@ -48,14 +71,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
+    maxWidth: 300,
   },
   button: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.xl,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    minWidth: 140,
+    alignItems: 'center',
+  },
+  buttonPressed: {
+    opacity: 0.9,
   },
   buttonText: {
     color: colors.background,

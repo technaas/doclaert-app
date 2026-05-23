@@ -10,6 +10,11 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '@/src/lib/supabase';
+import {
+  STARTUP_AUTH_TIMEOUT_MS,
+  startupLog,
+  withTimeout,
+} from '@/src/lib/startup';
 import type { Profile } from '@/src/types';
 
 type AuthContextValue = {
@@ -48,9 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUserProfile = useCallback(async (authUser: User) => {
+    startupLog('Loading user profile', { userId: authUser.id });
     const profileData = await fetchProfile(authUser.id);
     setProfile(profileData);
     setUser(authUser);
+    startupLog('Profile loaded');
   }, []);
 
   const clearAuthState = useCallback(() => {
@@ -59,63 +66,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  const finishLoading = useCallback(() => {
+    setLoading(false);
+    startupLog('Auth loading finished');
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
+      startupLog('Auth initialization started');
+
       try {
         const {
           data: { session: currentSession },
-        } = await supabase.auth.getSession();
+        } = await withTimeout(
+          supabase.auth.getSession(),
+          STARTUP_AUTH_TIMEOUT_MS,
+          'supabase.auth.getSession',
+        );
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         setSession(currentSession);
+        startupLog('Session resolved', { hasSession: Boolean(currentSession) });
 
         if (currentSession?.user) {
-          await loadUserProfile(currentSession.user);
+          try {
+            await withTimeout(
+              loadUserProfile(currentSession.user),
+              STARTUP_AUTH_TIMEOUT_MS,
+              'fetchProfile',
+            );
+          } catch (profileError) {
+            startupLog('Profile load failed on startup (continuing)', profileError);
+            setUser(currentSession.user);
+            setProfile(null);
+          }
         } else {
           clearAuthState();
         }
-      } catch {
+      } catch (error) {
+        startupLog('Auth initialization failed (continuing)', error);
         if (mounted) {
           clearAuthState();
         }
       } finally {
         if (mounted) {
-          setLoading(false);
+          finishLoading();
         }
       }
     };
 
-    initializeAuth();
+    void initializeAuth();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (!mounted) return;
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mounted) {
+        return;
+      }
 
+      startupLog('Auth state change', { event, hasSession: Boolean(nextSession) });
       setSession(nextSession);
 
-      if (nextSession?.user) {
-        try {
-          await loadUserProfile(nextSession.user);
-        } catch {
-          clearAuthState();
-        }
-      } else {
+      if (!nextSession?.user) {
         clearAuthState();
+        return;
       }
+
+      // Defer Supabase calls to avoid deadlocking getSession() during INITIAL_SESSION.
+      if (event === 'INITIAL_SESSION') {
+        return;
+      }
+
+      setTimeout(() => {
+        if (!mounted) {
+          return;
+        }
+
+        void (async () => {
+          try {
+            await loadUserProfile(nextSession.user);
+          } catch (profileError) {
+            startupLog('Profile load failed on auth event', profileError);
+            setUser(nextSession.user);
+            setProfile(null);
+          }
+        })();
+      }, 0);
     });
+
+    const authSafetyTimer = setTimeout(() => {
+      if (mounted) {
+        startupLog('Auth safety timeout — forcing loading complete');
+        finishLoading();
+      }
+    }, STARTUP_AUTH_TIMEOUT_MS + 1000);
 
     return () => {
       mounted = false;
+      clearTimeout(authSafetyTimer);
       subscription.unsubscribe();
     };
-  }, [clearAuthState, loadUserProfile]);
+  }, [clearAuthState, finishLoading, loadUserProfile]);
 
   const login = useCallback(
     async (email: string, password: string) => {
+      startupLog('Login started');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -131,11 +191,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSession(data.session);
       await loadUserProfile(data.user);
+      startupLog('Login complete');
     },
     [loadUserProfile],
   );
 
   const logout = useCallback(async () => {
+    startupLog('Logout started');
     const { error } = await supabase.auth.signOut();
 
     if (error) {
@@ -143,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     clearAuthState();
+    startupLog('Logout complete');
   }, [clearAuthState]);
 
   const value = useMemo(

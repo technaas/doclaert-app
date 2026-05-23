@@ -1,16 +1,50 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { cardStyle, colors, radius, spacing } from '@/src/constants/theme';
+
+function SkeletonBlock({
+  style,
+  opacity,
+}: {
+  style: object;
+  opacity: Animated.Value;
+}) {
+  return (
+    <Animated.View style={[styles.block, style, { opacity }]} />
+  );
+}
 
 export function ListRowSkeleton() {
+  const pulse = useRef(new Animated.Value(0.55)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0.55,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
   return (
     <View style={styles.card}>
-      <View style={[styles.block, styles.title]} />
-      <View style={[styles.block, styles.line]} />
-      <View style={[styles.block, styles.lineShort]} />
+      <SkeletonBlock style={styles.title} opacity={pulse} />
+      <SkeletonBlock style={styles.line} opacity={pulse} />
+      <SkeletonBlock style={styles.lineShort} opacity={pulse} />
       <View style={styles.row}>
-        <View style={[styles.block, styles.pill]} />
-        <View style={[styles.block, styles.pill]} />
+        <SkeletonBlock style={styles.pill} opacity={pulse} />
+        <SkeletonBlock style={styles.pill} opacity={pulse} />
       </View>
     </View>
   );
@@ -18,10 +52,7 @@ export function ListRowSkeleton() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    ...cardStyle,
     padding: spacing.lg,
     gap: spacing.sm,
     marginBottom: spacing.md,

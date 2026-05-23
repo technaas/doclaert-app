@@ -9,8 +9,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DocAlertLogo } from '@/src/components/branding/DocAlertLogo';
 import { useAuth } from '@/src/context/AuthContext';
+import { getErrorMessage } from '@/src/lib/errors';
+import { cardStyle, colors, radius, shadows, spacing } from '@/src/constants/theme';
 
 export function LoginScreen() {
   const { login } = useAuth();
@@ -32,109 +36,126 @@ export function LoginScreen() {
     try {
       await login(email, password);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
-      setError(message);
+      setError(getErrorMessage(err, 'Login failed. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.content}>
-        <Text style={styles.title}>DocAlert</Text>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.hero}>
+          <DocAlertLogo size="lg" showTagline />
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#9CA3AF"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          editable={!loading}
-        />
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Sign in</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9CA3AF"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          textContentType="password"
-          editable={!loading}
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor={colors.textSubtle}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            editable={!loading}
+          />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor={colors.textSubtle}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            textContentType="password"
+            editable={!loading}
+          />
 
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              (loading || pressed) && styles.buttonDisabled,
+            ]}
+            onPress={() => void handleLogin()}
+            disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color={colors.background} />
+            ) : (
+              <Text style={styles.buttonText}>Login</Text>
+            )}
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  content: {
-    flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    gap: 12,
+    paddingHorizontal: spacing.xl,
+    gap: spacing.xxl,
   },
-  title: {
-    fontSize: 32,
+  hero: {
+    alignItems: 'center',
+  },
+  formCard: {
+    ...cardStyle,
+    padding: spacing.xl,
+    gap: spacing.md,
+    ...shadows.cardSoft,
+  },
+  formTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 24,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 14,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
-    backgroundColor: '#FFFFFF',
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   button: {
-    marginTop: 8,
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
+    marginTop: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.85,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600',
   },
   error: {
-    color: '#DC2626',
+    color: colors.danger,
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -3,6 +3,8 @@ import type { StaffListItem, StaffMember } from '@/src/types/staff';
 
 type LookupMaps = {
   branchToBrandId: Map<string, string>;
+  brandMap?: Map<string, string>;
+  branchMap?: Map<string, string>;
 };
 
 export function filterStaffList(
@@ -31,9 +33,16 @@ export function filterStaffList(
     }
     if (!search) return true;
 
+    const branchName =
+      maps.branchMap?.get(member.branch_id)?.toLowerCase() ?? '';
+    const brandId = maps.branchToBrandId.get(member.branch_id) ?? member.brand_id;
+    const brandName = maps.brandMap?.get(brandId)?.toLowerCase() ?? '';
+
     return (
       member.name.toLowerCase().includes(search) ||
-      (member.staff_id ?? '').toLowerCase().includes(search)
+      (member.staff_id ?? '').toLowerCase().includes(search) ||
+      branchName.includes(search) ||
+      brandName.includes(search)
     );
   });
 }

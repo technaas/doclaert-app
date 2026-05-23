@@ -1,5 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { modalScreenOptions, stackScreenOptions } from '@/src/constants/navigation';
+import type { AlertFilters } from '@/src/types/alerts';
 import { MainTabNavigator } from '@/src/navigation/MainTabNavigator';
 import { AlertsScreen } from '@/src/screens/alerts/AlertsScreen';
 import { BrandDetailScreen } from '@/src/screens/brands/BrandDetailScreen';
@@ -10,7 +12,12 @@ import { DocumentDetailScreen } from '@/src/screens/documents/DocumentDetailScre
 
 export type AppStackParamList = {
   MainTabs: undefined;
-  Alerts: undefined;
+  Alerts:
+    | {
+        tab?: AlertFilters['tab'];
+        status?: AlertFilters['status'];
+      }
+    | undefined;
   Brands: undefined;
   BrandDetail: { brandId: string };
   Branches: undefined;
@@ -22,64 +29,31 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 
 export function AppStack() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={stackScreenOptions}>
       <Stack.Screen
         name="MainTabs"
         component={MainTabNavigator}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="Alerts"
-        component={AlertsScreen}
-        options={{
-          title: 'Alerts',
-          headerTintColor: '#2563EB',
-          headerBackTitle: 'Back',
-        }}
-      />
-      <Stack.Screen
-        name="Brands"
-        component={BrandsScreen}
-        options={{
-          title: 'Brands',
-          headerTintColor: '#2563EB',
-          headerBackTitle: 'Back',
-        }}
-      />
+      <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alerts' }} />
+      <Stack.Screen name="Brands" component={BrandsScreen} options={{ title: 'Brands' }} />
       <Stack.Screen
         name="BrandDetail"
         component={BrandDetailScreen}
-        options={{
-          title: 'Brand Details',
-          headerTintColor: '#2563EB',
-          headerBackTitle: 'Back',
-        }}
+        options={{ title: 'Brand Details' }}
       />
-      <Stack.Screen
-        name="Branches"
-        component={BranchesScreen}
-        options={{
-          title: 'Branches',
-          headerTintColor: '#2563EB',
-          headerBackTitle: 'Back',
-        }}
-      />
+      <Stack.Screen name="Branches" component={BranchesScreen} options={{ title: 'Branches' }} />
       <Stack.Screen
         name="BranchDetail"
         component={BranchDetailScreen}
-        options={{
-          title: 'Branch Details',
-          headerTintColor: '#2563EB',
-          headerBackTitle: 'Back',
-        }}
+        options={{ title: 'Branch Details' }}
       />
       <Stack.Screen
         name="DocumentDetail"
         component={DocumentDetailScreen}
         options={{
-          presentation: 'modal',
+          ...modalScreenOptions,
           title: 'Document Details',
-          headerTintColor: '#2563EB',
         }}
       />
     </Stack.Navigator>

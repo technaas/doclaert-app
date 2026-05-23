@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -15,7 +16,7 @@ type DocumentCardProps = {
   onPress: () => void;
 };
 
-export function DocumentCard({ document, onPress }: DocumentCardProps) {
+function DocumentCardComponent({ document, onPress }: DocumentCardProps) {
   const tone = statusBadgeTone(document.displayStatus);
 
   return (
@@ -116,3 +117,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 });
+
+export const DocumentCard = memo(DocumentCardComponent);

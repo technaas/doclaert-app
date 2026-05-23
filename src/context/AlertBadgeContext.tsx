@@ -1,16 +1,14 @@
 import {
   createContext,
-  useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from 'react';
 
 import { useAuth } from '@/src/context/AuthContext';
+import { useCompanyDocumentsQuery } from '@/src/hooks/queries/useCompanyDocumentsQuery';
 import { countDocumentAlerts } from '@/src/lib/alertFilters';
-import { fetchCompanyDocumentsData } from '@/src/services/documents';
+import { getQueryScreenState } from '@/src/lib/queryScreenState';
 
 type AlertBadgeContextValue = {
   count: number;
@@ -23,37 +21,26 @@ const AlertBadgeContext = createContext<AlertBadgeContextValue | undefined>(unde
 export function AlertBadgeProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
-  const [count, setCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const query = useCompanyDocumentsQuery(companyId);
+  const { isInitialLoading } = getQueryScreenState(query);
 
-  const refresh = useCallback(async () => {
-    if (!companyId) {
-      setCount(0);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const data = await fetchCompanyDocumentsData(companyId);
-      setCount(countDocumentAlerts(data.documents, data.alertThresholdDays));
-    } catch {
-      setCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const count = useMemo(() => {
+    if (!query.data) return 0;
+    return countDocumentAlerts(
+      query.data.documents,
+      query.data.alertThresholdDays,
+    );
+  }, [query.data]);
 
   const value = useMemo(
     () => ({
       count,
-      loading,
-      refresh,
+      loading: isInitialLoading,
+      refresh: async () => {
+        await query.refetch();
+      },
     }),
-    [count, loading, refresh],
+    [count, isInitialLoading, query],
   );
 
   return <AlertBadgeContext.Provider value={value}>{children}</AlertBadgeContext.Provider>;

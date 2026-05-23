@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -11,7 +12,7 @@ type BrandCardProps = {
   onPress: () => void;
 };
 
-export function BrandCard({ brand, onPress }: BrandCardProps) {
+function BrandCardComponent({ brand, onPress }: BrandCardProps) {
   const statusTone =
     (brand.status ?? '') === 'active'
       ? 'success'
@@ -96,3 +97,5 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
 });
+
+export const BrandCard = memo(BrandCardComponent);

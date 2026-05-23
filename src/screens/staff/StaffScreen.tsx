@@ -1,13 +1,16 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { AppScreenLayout } from '@/src/components/layout/AppScreenLayout';
 import { StaffCard } from '@/src/components/staff/StaffCard';
 import { StaffFiltersBar } from '@/src/components/staff/StaffFiltersBar';
+import { StaffSummaryStrip } from '@/src/components/staff/StaffSummaryStrip';
 import { EmptyState } from '@/src/components/ui/EmptyState';
 import { ErrorState } from '@/src/components/ui/ErrorState';
 import { ListRowSkeleton } from '@/src/components/ui/ListRowSkeleton';
 import { SearchInput } from '@/src/components/ui/SearchInput';
+import { EMPTY_STATES } from '@/src/constants/emptyStates';
+import { FLAT_LIST_PERF } from '@/src/constants/listConfig';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCompanyStaffData } from '@/src/hooks/useCompanyStaffData';
@@ -17,7 +20,7 @@ import { DEFAULT_STAFF_FILTERS, type StaffFilters } from '@/src/types/filters';
 
 type Props = NativeStackScreenProps<StaffStackParamList, 'StaffList'>;
 
-export function StaffScreen({ navigation }: Props) {
+export function StaffScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
   const {
@@ -34,12 +37,41 @@ export function StaffScreen({ navigation }: Props) {
     retry,
   } = useCompanyStaffData(companyId);
 
-  const [filters, setFilters] = useState<StaffFilters>(DEFAULT_STAFF_FILTERS);
+  const routeStatus = route.params?.status;
+
+  const [filters, setFilters] = useState<StaffFilters>(() => ({
+    ...DEFAULT_STAFF_FILTERS,
+    ...(routeStatus ? { status: routeStatus } : {}),
+  }));
+
+  useEffect(() => {
+    if (routeStatus) {
+      setFilters((prev) => ({ ...prev, status: routeStatus }));
+    }
+  }, [routeStatus]);
 
   const filteredStaff = useMemo(() => {
     const filtered = filterStaffList(staff, filters, { branchToBrandId });
     return enrichStaffList(filtered, brandMap, branchMap, branchToBrandId);
   }, [staff, filters, branchToBrandId, brandMap, branchMap]);
+
+  const summaryCounts = useMemo(() => {
+    let active = 0;
+    let inactive = 0;
+    for (const member of filteredStaff) {
+      const status = (member.status ?? '').toLowerCase();
+      if (status === 'active') {
+        active += 1;
+      } else if (status === 'inactive') {
+        inactive += 1;
+      }
+    }
+    return {
+      total: filteredStaff.length,
+      active,
+      inactive,
+    };
+  }, [filteredStaff]);
 
   const updateFilters = (patch: Partial<StaffFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -48,6 +80,11 @@ export function StaffScreen({ navigation }: Props) {
   return (
     <AppScreenLayout title="Staff" subtitle="Read-only staff directory">
       <View style={styles.filtersWrap}>
+        <StaffSummaryStrip
+          total={summaryCounts.total}
+          active={summaryCounts.active}
+          inactive={summaryCounts.inactive}
+        />
         <SearchInput
           value={filters.search}
           onChangeText={(search) => updateFilters({ search })}
@@ -78,16 +115,13 @@ export function StaffScreen({ navigation }: Props) {
 
       {!loading && !error && filteredStaff.length === 0 ? (
         <View style={styles.listPad}>
-          <EmptyState
-            title="No staff found"
-            message="Try adjusting filters or search, or pull down to refresh."
-            icon="people-outline"
-          />
+          <EmptyState {...EMPTY_STATES.staff} />
         </View>
       ) : null}
 
       {!error && (staff.length > 0 || !loading) ? (
         <FlatList
+          {...FLAT_LIST_PERF}
           data={filteredStaff}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listPad}
