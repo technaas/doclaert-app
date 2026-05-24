@@ -18,7 +18,8 @@ import {
 import { useAuth } from '@/src/context/AuthContext';
 import { useNotifications } from '@/src/context/NotificationContext';
 import { cardStyle, colors, radius, spacing, typography } from '@/src/constants/theme';
-import { useCompanyName } from '@/src/hooks/useCompanyName';
+import { useCompanyProfile } from '@/src/hooks/useCompanyProfile';
+import { displayField } from '@/src/lib/staffDisplay';
 import type { NotificationPermissionStatus } from '@/src/types/notifications';
 
 function formatPermissionStatus(status: NotificationPermissionStatus): string {
@@ -85,7 +86,7 @@ function SettingsRow({
 export function SettingsScreen() {
   const { user, profile, logout } = useAuth();
   const companyId = profile?.company_id;
-  const { companyName, loading: companyLoading } = useCompanyName(companyId);
+  const { profile: companyProfile, loading: companyLoading } = useCompanyProfile(companyId);
   const {
     permissionStatus,
     pushEnabled,
@@ -185,15 +186,60 @@ export function SettingsScreen() {
           />
         }>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Account</Text>
+          <Text style={styles.cardTitle}>Company</Text>
+          <Text style={styles.sectionHint}>Read-only company details</Text>
           <SettingsRow
-            label="Company"
+            label="Company name"
             value={
               companyLoading
                 ? 'Loading…'
-                : companyName ?? '—'
+                : displayField(companyProfile?.name)
             }
           />
+          <SettingsRow
+            label="Business type"
+            value={
+              companyLoading
+                ? 'Loading…'
+                : displayField(companyProfile?.business_type)
+            }
+          />
+          <SettingsRow
+            label="Country"
+            value={
+              companyLoading
+                ? 'Loading…'
+                : displayField(companyProfile?.country)
+            }
+          />
+          <SettingsRow
+            label="Contact person"
+            value={
+              companyLoading
+                ? 'Loading…'
+                : displayField(companyProfile?.contact_person)
+            }
+          />
+          <SettingsRow
+            label="Contact number"
+            value={
+              companyLoading
+                ? 'Loading…'
+                : displayField(companyProfile?.contact_number)
+            }
+          />
+          <SettingsRow
+            label="Email"
+            value={
+              companyLoading
+                ? 'Loading…'
+                : displayField(companyProfile?.email)
+            }
+          />
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Account</Text>
           <SettingsRow label="User" value={user?.email ?? '—'} />
           <SettingsRow label="Role" value={profile?.role ?? '—'} />
           <SettingsRow label="App version" value={appVersion} />
@@ -287,6 +333,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...typography.sectionTitle,
+    marginBottom: spacing.sm,
+  },
+  sectionHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: -spacing.xs,
     marginBottom: spacing.sm,
   },
   row: {

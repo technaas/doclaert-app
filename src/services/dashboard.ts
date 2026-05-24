@@ -1,4 +1,4 @@
-import { isExpired, isExpiringSoon } from '@/src/lib/expiry';
+import { countDocumentsByStatus } from '@/src/lib/documentCounts';
 import { supabase } from '@/src/lib/supabase';
 import type { DashboardStats } from '@/src/types/dashboard';
 
@@ -60,7 +60,7 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
       .eq('status', 'active'),
     supabase
       .from('documents')
-      .select('expiry_date')
+      .select('expiry_date, type')
       .eq('company_id', companyId)
       .not('expiry_date', 'is', null),
   ]);
@@ -84,26 +84,19 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
     0,
   );
 
-  let expiringSoonCount = 0;
-  let expiredCount = 0;
-
-  for (const doc of documentsResult.data ?? []) {
-    if (!doc.expiry_date) continue;
-
-    if (isExpired(doc.expiry_date)) {
-      expiredCount += 1;
-    } else if (isExpiringSoon(doc.expiry_date, alertThresholdDays)) {
-      expiringSoonCount += 1;
-    }
-  }
+  const documentCounts = countDocumentsByStatus(
+    documentsResult.data ?? [],
+    alertThresholdDays,
+  );
 
   return {
     brandsCount: brandsResult.count ?? 0,
     branchesCount: branchesResult.count ?? 0,
     activeStaffCount: activeStaff.length,
     totalPay,
-    expiringSoonCount,
-    expiredCount,
+    validDocuments: documentCounts.valid,
+    expiringSoon: documentCounts.expiringSoon,
+    expired: documentCounts.expired,
     companyName,
     alertThresholdDays,
   };

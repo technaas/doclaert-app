@@ -18,6 +18,7 @@ import { cardStyle, colors, spacing, typography } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDashboardQuery } from '@/src/hooks/queries/useDashboardQuery';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
+import { totalBreakdown } from '@/src/types/dashboard';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { MainTabParamList } from '@/src/navigation/MainTabNavigator';
 
@@ -60,7 +61,7 @@ export function DashboardScreen() {
     navigation.navigate('Salary');
   };
 
-  const openDocuments = (status: 'expiring' | 'expired') => {
+  const openDocuments = (status: 'active' | 'expiring' | 'expired') => {
     navigation.navigate('Documents', {
       screen: 'DocumentsList',
       params: { status },
@@ -76,8 +77,9 @@ export function DashboardScreen() {
     stats.brandsCount === 0 &&
     stats.branchesCount === 0 &&
     stats.activeStaffCount === 0 &&
-    stats.expiringSoonCount === 0 &&
-    stats.expiredCount === 0;
+    totalBreakdown(stats.validDocuments) === 0 &&
+    totalBreakdown(stats.expiringSoon) === 0 &&
+    totalBreakdown(stats.expired) === 0;
 
   const greeting = stats?.companyName ? `Welcome, ${stats.companyName}` : 'Dashboard';
   const today = new Date().toLocaleDateString(undefined, {
@@ -138,16 +140,11 @@ export function DashboardScreen() {
               <Text style={styles.sectionLabel}>Organization</Text>
               <View style={styles.grid}>
                 <SummaryCard
-                  label="Brands"
-                  value={formatCount(stats.brandsCount)}
+                  label="Brands & Branches"
+                  value={`${formatCount(stats.brandsCount)} / ${formatCount(stats.branchesCount)}`}
                   icon="business-outline"
+                  subtitle={`${formatCount(stats.brandsCount)} brands · ${formatCount(stats.branchesCount)} branches`}
                   onPress={() => openAppScreen('Brands')}
-                />
-                <SummaryCard
-                  label="Branches"
-                  value={formatCount(stats.branchesCount)}
-                  icon="location-outline"
-                  onPress={() => openAppScreen('Branches')}
                 />
               </View>
             </View>
@@ -176,18 +173,25 @@ export function DashboardScreen() {
               <Text style={styles.sectionLabel}>Document alerts</Text>
               <View style={styles.grid}>
                 <SummaryCard
+                  label="Valid Documents"
+                  icon="checkmark-circle-outline"
+                  tone="success"
+                  breakdown={stats.validDocuments}
+                  onPress={() => openDocuments('active')}
+                />
+                <SummaryCard
                   label="Expiring Soon"
-                  value={formatCount(stats.expiringSoonCount)}
                   icon="time-outline"
                   tone="warning"
+                  breakdown={stats.expiringSoon}
                   subtitle={`Within ${stats.alertThresholdDays} days`}
                   onPress={() => openDocuments('expiring')}
                 />
                 <SummaryCard
                   label="Expired"
-                  value={formatCount(stats.expiredCount)}
                   icon="close-circle-outline"
                   tone="danger"
+                  breakdown={stats.expired}
                   subtitle="Past expiry date"
                   onPress={() => openDocuments('expired')}
                 />

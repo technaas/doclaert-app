@@ -4,7 +4,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { colors, radius, spacing } from '@/src/constants/theme';
-import { formatPay } from '@/src/lib/format';
+import {
+  formatContactNumber,
+  formatStaffType,
+} from '@/src/lib/staffDisplay';
 import { isPartTimeType } from '@/src/lib/staffFilters';
 import type { StaffListItem } from '@/src/types/staff';
 
@@ -15,6 +18,7 @@ type StaffCardProps = {
 
 function StaffCardComponent({ staff, onPress }: StaffCardProps) {
   const showPartTime = isPartTimeType(staff.staff_type);
+  const contactNumber = formatContactNumber(staff.contact_number);
   const statusTone =
     (staff.status ?? '') === 'active'
       ? 'success'
@@ -27,6 +31,7 @@ function StaffCardComponent({ staff, onPress }: StaffCardProps) {
       <View style={styles.header}>
         <View style={styles.titleWrap}>
           <Text style={styles.name}>{staff.name}</Text>
+          <Text style={styles.staffType}>{formatStaffType(staff.staff_type)}</Text>
           {staff.staff_id ? <Text style={styles.staffId}>ID: {staff.staff_id}</Text> : null}
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
@@ -36,14 +41,13 @@ function StaffCardComponent({ staff, onPress }: StaffCardProps) {
         {staff.brandName} · {staff.branchName}
       </Text>
 
+      {contactNumber ? (
+        <Text style={styles.contact}>Contact: {contactNumber}</Text>
+      ) : null}
+
       <View style={styles.row}>
-        <StatusBadge label={staff.staff_type ?? 'Full Time'} tone="default" />
         <StatusBadge label={staff.status ?? '—'} tone={statusTone} />
       </View>
-
-      <Text style={styles.salary}>
-        Salary: {typeof staff.salary === 'number' ? formatPay(staff.salary) : '—'}
-      </Text>
 
       {showPartTime && (staff.partTimeBrandName || staff.partTimeBranchName) ? (
         <View style={styles.partTime}>
@@ -88,6 +92,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
   },
+  staffType: {
+    marginTop: 2,
+    fontSize: 13,
+    color: colors.textMuted,
+    fontWeight: '500',
+  },
   staffId: {
     marginTop: 2,
     fontSize: 12,
@@ -98,16 +108,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacing.sm,
   },
+  contact: {
+    fontSize: 13,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  salary: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
   },
   partTime: {
     marginTop: spacing.sm,

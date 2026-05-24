@@ -73,14 +73,16 @@ export function DocumentsScreen({ navigation, route }: Props) {
   );
 
   const summaryCounts = useMemo(() => {
+    let valid = 0;
     let expiringSoon = 0;
     let expired = 0;
     for (const item of filteredItems) {
-      if (item.displayStatus === 'expiring') expiringSoon += 1;
+      if (item.displayStatus === 'active') valid += 1;
+      else if (item.displayStatus === 'expiring') expiringSoon += 1;
       else if (item.displayStatus === 'expired') expired += 1;
     }
     return {
-      total: filteredItems.length,
+      valid,
       expiringSoon,
       expired,
     };
@@ -94,7 +96,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
     <AppScreenLayout title="Documents" subtitle="Staff documents & branch licenses">
       <View style={styles.controls}>
         <DocumentsSummaryStrip
-          total={summaryCounts.total}
+          valid={summaryCounts.valid}
           expiringSoon={summaryCounts.expiringSoon}
           expired={summaryCounts.expired}
         />

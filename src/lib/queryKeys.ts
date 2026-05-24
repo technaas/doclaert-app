@@ -5,6 +5,7 @@ import type {
 
 export const queryKeys = {
   companyName: (companyId: string) => ['company', companyId, 'name'] as const,
+  companyProfile: (companyId: string) => ['company', companyId, 'profile'] as const,
   dashboard: (companyId: string) => ['company', companyId, 'dashboard'] as const,
   staff: (companyId: string) => ['company', companyId, 'staff'] as const,
   documents: (companyId: string) => ['company', companyId, 'documents'] as const,

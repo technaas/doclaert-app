@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ComponentProps } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import type { DocumentCountBreakdown } from '@/src/types/dashboard';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 type SummaryCardProps = {
   label: string;
-  value: string;
+  value?: string;
   icon: IconName;
   tone?: 'default' | 'warning' | 'danger' | 'success';
   subtitle?: string;
+  breakdown?: DocumentCountBreakdown;
   onPress?: () => void;
 };
 
@@ -22,6 +25,7 @@ const TONE_STYLES = {
     labelColor: '#2563EB',
     valueColor: '#111827',
     subtitleColor: '#6B7280',
+    breakdownColor: '#111827',
   },
   warning: {
     cardBg: '#FFF7ED',
@@ -31,6 +35,7 @@ const TONE_STYLES = {
     labelColor: '#C2410C',
     valueColor: '#111827',
     subtitleColor: '#78716C',
+    breakdownColor: '#111827',
   },
   danger: {
     cardBg: '#FEF2F2',
@@ -40,17 +45,30 @@ const TONE_STYLES = {
     labelColor: '#B91C1C',
     valueColor: '#111827',
     subtitleColor: '#78716C',
+    breakdownColor: '#111827',
   },
   success: {
-    cardBg: '#FFFFFF',
-    cardBorder: '#E5E7EB',
-    iconBg: '#ECFDF5',
+    cardBg: '#ECFDF5',
+    cardBorder: '#A7F3D0',
+    iconBg: '#D1FAE5',
     iconColor: '#059669',
-    labelColor: '#059669',
+    labelColor: '#047857',
     valueColor: '#111827',
-    subtitleColor: '#6B7280',
+    subtitleColor: '#047857',
+    breakdownColor: '#111827',
   },
 } as const;
+
+function formatAccessibilityLabel(
+  label: string,
+  value?: string,
+  breakdown?: DocumentCountBreakdown,
+): string {
+  if (breakdown) {
+    return `${label}, Staff ${breakdown.staff}, Licenses ${breakdown.licenses}`;
+  }
+  return `${label}, ${value ?? ''}`;
+}
 
 export function SummaryCard({
   label,
@@ -58,6 +76,7 @@ export function SummaryCard({
   icon,
   tone = 'default',
   subtitle,
+  breakdown,
   onPress,
 }: SummaryCardProps) {
   const toneStyle = TONE_STYLES[tone];
@@ -85,12 +104,27 @@ export function SummaryCard({
           ) : null}
         </View>
       </View>
-      <Text style={[styles.value, { color: toneStyle.valueColor }]}>{value}</Text>
+
+      {breakdown ? (
+        <View style={styles.breakdown}>
+          <Text style={[styles.breakdownLine, { color: toneStyle.breakdownColor }]}>
+            Staff: {breakdown.staff.toLocaleString()}
+          </Text>
+          <Text style={[styles.breakdownLine, { color: toneStyle.breakdownColor }]}>
+            Licenses: {breakdown.licenses.toLocaleString()}
+          </Text>
+        </View>
+      ) : value ? (
+        <Text style={[styles.value, { color: toneStyle.valueColor }]}>{value}</Text>
+      ) : null}
+
       {subtitle ? (
         <Text style={[styles.subtitle, { color: toneStyle.subtitleColor }]}>{subtitle}</Text>
       ) : null}
     </>
   );
+
+  const accessibilityLabel = formatAccessibilityLabel(label, value, breakdown);
 
   if (onPress) {
     return (
@@ -103,7 +137,7 @@ export function SummaryCard({
         ]}
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${label}, ${value}`}>
+        accessibilityLabel={accessibilityLabel}>
         {content}
       </Pressable>
     );
@@ -165,6 +199,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: -0.5,
+  },
+  breakdown: {
+    gap: 4,
+  },
+  breakdownLine: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   subtitle: {
     marginTop: 4,

@@ -22,7 +22,7 @@ export async function fetchCompanyStaffData(companyId: string): Promise<CompanyS
     supabase
       .from('staff')
       .select(
-        'id,company_id,brand_id,branch_id,name,role,staff_id,contact_number,status,salary,staff_type,part_time_license_expiry_date,part_time_note,part_time_brand_id,part_time_branch_id,part_time_license_file_url',
+        'id,company_id,brand_id,branch_id,name,role,staff_id,contact_number,status,salary,salary_type,staff_type,part_time_license_expiry_date,part_time_note,part_time_brand_id,part_time_branch_id,part_time_license_file_url',
       )
       .eq('company_id', companyId)
       .order('name'),
@@ -62,7 +62,7 @@ export async function fetchStaffMember(
   const { data, error } = await supabase
     .from('staff')
     .select(
-      'id,company_id,brand_id,branch_id,name,role,staff_id,contact_number,status,salary,staff_type,part_time_license_expiry_date,part_time_note,part_time_brand_id,part_time_branch_id,part_time_license_file_url',
+      'id,company_id,brand_id,branch_id,name,role,staff_id,contact_number,status,salary,salary_type,staff_type,part_time_license_expiry_date,part_time_note,part_time_brand_id,part_time_branch_id,part_time_license_file_url',
     )
     .eq('company_id', companyId)
     .eq('id', staffId)

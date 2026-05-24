@@ -1,21 +1,21 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 type DocumentsSummaryStripProps = {
-  total: number;
+  valid: number;
   expiringSoon: number;
   expired: number;
 };
 
-type StatTone = 'neutral' | 'warning' | 'danger';
+type StatTone = 'success' | 'warning' | 'danger';
 
 const TONE_STYLES: Record<
   StatTone,
   { bg: string; border: string; label: string; value: string }
 > = {
-  neutral: {
-    bg: '#EFF6FF',
-    border: '#BFDBFE',
-    label: '#2563EB',
+  success: {
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+    label: '#047857',
     value: '#111827',
   },
   warning: {
@@ -65,13 +65,13 @@ function CompactStatCard({
 }
 
 export function DocumentsSummaryStrip({
-  total,
+  valid,
   expiringSoon,
   expired,
 }: DocumentsSummaryStripProps) {
   return (
     <View style={styles.row}>
-      <CompactStatCard value={total} label="Total Docs" tone="neutral" />
+      <CompactStatCard value={valid} label="Valid Documents" tone="success" />
       <CompactStatCard value={expiringSoon} label="Expiring Soon" tone="warning" />
       <CompactStatCard value={expired} label="Expired" tone="danger" />
     </View>

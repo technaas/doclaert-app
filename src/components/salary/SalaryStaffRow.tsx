@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { SalaryTypeBadge } from '@/src/components/salary/SalaryTypeBadge';
 import { colors, radius, spacing } from '@/src/constants/theme';
 import { formatPay } from '@/src/lib/format';
+import { formatStaffType } from '@/src/lib/staffDisplay';
 import type { StaffListItem } from '@/src/types/staff';
 
 type SalaryStaffRowProps = {
@@ -9,18 +11,33 @@ type SalaryStaffRowProps = {
 };
 
 export function SalaryStaffRow({ staff }: SalaryStaffRowProps) {
+  const salaryLabel =
+    typeof staff.salary === 'number' ? formatPay(staff.salary) : '—';
+
   return (
     <View style={styles.card}>
-      <Text style={styles.name}>{staff.name}</Text>
+      <View style={styles.header}>
+        <View style={styles.titleBlock}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={2}>
+              {staff.name}
+            </Text>
+            <SalaryTypeBadge salaryType={staff.salary_type} />
+          </View>
+          <Text style={styles.staffType}>{formatStaffType(staff.staff_type)}</Text>
+        </View>
+        <View style={styles.salaryWrap}>
+          <Text style={styles.salaryLabel}>Salary</Text>
+          <Text style={styles.salaryAmount}>{salaryLabel}</Text>
+        </View>
+      </View>
+
       <Text style={styles.meta}>
         {staff.brandName} · {staff.branchName}
       </Text>
-      <View style={styles.footer}>
-        <Text style={styles.role}>{staff.role ?? '—'}</Text>
-        <Text style={styles.salary}>
-          {typeof staff.salary === 'number' ? formatPay(staff.salary) : '—'}
-        </Text>
-      </View>
+      {staff.role?.trim() ? (
+        <Text style={styles.role}>{staff.role.trim()}</Text>
+      ) : null}
     </View>
   );
 }
@@ -34,31 +51,60 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   name: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+    flexShrink: 1,
   },
-  meta: {
+  staffType: {
     marginTop: 4,
     fontSize: 13,
     color: colors.textMuted,
+    fontWeight: '500',
   },
-  footer: {
+  salaryWrap: {
+    alignItems: 'flex-end',
+    minWidth: 92,
+  },
+  salaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  salaryAmount: {
+    marginTop: 2,
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.3,
+  },
+  meta: {
     marginTop: spacing.sm,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  role: {
     fontSize: 13,
     color: colors.textMuted,
-    flex: 1,
-    paddingRight: spacing.sm,
   },
-  salary: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
+  role: {
+    marginTop: 4,
+    fontSize: 13,
+    color: colors.textSubtle,
   },
 });

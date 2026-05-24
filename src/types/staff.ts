@@ -20,6 +20,7 @@ export type StaffMember = {
   contact_number: string | null;
   status: string | null;
   salary: number | null;
+  salary_type: string | null;
   staff_type: string | null;
   part_time_license_expiry_date: string | null;
   part_time_note: string | null;
