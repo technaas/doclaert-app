@@ -9,6 +9,7 @@ export const DOCUMENT_LABELS: Record<string, string> = {
   civil_defense: 'Civil Defense Certificate',
   tenancy_contract: 'Tenancy Contract',
   paci_certificate: 'PACI Certificate',
+  vehicle_daftar: 'Vehicle Daftar',
   other: 'Other',
 };
 

@@ -4,26 +4,35 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
+import {
+  clearStoredAuthSession,
+  isInvalidRefreshTokenError,
+  SESSION_EXPIRED_MESSAGE,
+} from '@/src/lib/authSession';
+import { queryClient } from '@/src/lib/queryClient';
 import { supabase } from '@/src/lib/supabase';
 import {
   STARTUP_AUTH_TIMEOUT_MS,
   startupLog,
   withTimeout,
 } from '@/src/lib/startup';
-import type { Profile } from '@/src/types';
+import type { Profile } from '@/types';
 
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  sessionNotice: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearSessionNotice: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -51,6 +60,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+
+  const recoveringRef = useRef(false);
+  const intentionalLogoutRef = useRef(false);
+  const signedOutHandledRef = useRef(false);
+  const storageClearedRef = useRef(false);
+  const hadSessionRef = useRef(false);
+  const queryCacheClearedRef = useRef(false);
+  const sessionExpiredNoticeSetRef = useRef(false);
+
+  const clearAuthState = useCallback(() => {
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+  }, []);
+
+  const clearSessionNotice = useCallback(() => {
+    setSessionNotice(null);
+    sessionExpiredNoticeSetRef.current = false;
+  }, []);
+
+  const finishLoading = useCallback(() => {
+    setLoading(false);
+    startupLog('Auth loading finished');
+  }, []);
+
+  const clearQueryCacheOnce = useCallback(() => {
+    if (queryCacheClearedRef.current) {
+      return;
+    }
+    queryCacheClearedRef.current = true;
+    queryClient.clear();
+  }, []);
+
+  const clearStorageOnce = useCallback(async () => {
+    if (storageClearedRef.current) {
+      return;
+    }
+    storageClearedRef.current = true;
+    await clearStoredAuthSession();
+  }, []);
+
+  const setSessionExpiredNoticeOnce = useCallback(() => {
+    if (sessionExpiredNoticeSetRef.current) {
+      return;
+    }
+    sessionExpiredNoticeSetRef.current = true;
+    setSessionNotice(SESSION_EXPIRED_MESSAGE);
+  }, []);
+
+  const applySignedInSession = useCallback(
+    (nextSession: Session) => {
+      signedOutHandledRef.current = false;
+      storageClearedRef.current = false;
+      queryCacheClearedRef.current = false;
+      sessionExpiredNoticeSetRef.current = false;
+      hadSessionRef.current = true;
+      setSession(nextSession);
+      setSessionNotice(null);
+    },
+    [],
+  );
+
+  const applySignedOutState = useCallback(
+    (options: { showSessionExpired: boolean }) => {
+      if (signedOutHandledRef.current) {
+        return;
+      }
+
+      signedOutHandledRef.current = true;
+      setSession(null);
+      clearAuthState();
+
+      if (options.showSessionExpired) {
+        setSessionExpiredNoticeOnce();
+      }
+
+      clearQueryCacheOnce();
+      intentionalLogoutRef.current = false;
+    },
+    [clearAuthState, clearQueryCacheOnce, setSessionExpiredNoticeOnce],
+  );
 
   const loadUserProfile = useCallback(async (authUser: User) => {
     startupLog('Loading user profile', { userId: authUser.id });
@@ -60,27 +151,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     startupLog('Profile loaded');
   }, []);
 
-  const clearAuthState = useCallback(() => {
-    setSession(null);
-    setUser(null);
-    setProfile(null);
-  }, []);
+  const recoverFromInvalidSession = useCallback(
+    async (source?: unknown) => {
+      if (recoveringRef.current || storageClearedRef.current) {
+        return;
+      }
 
-  const finishLoading = useCallback(() => {
-    setLoading(false);
-    startupLog('Auth loading finished');
-  }, []);
+      recoveringRef.current = true;
+
+      try {
+        startupLog('Invalid refresh token — clearing local session once', source);
+        await clearStorageOnce();
+        applySignedOutState({ showSessionExpired: true });
+      } finally {
+        recoveringRef.current = false;
+      }
+    },
+    [applySignedOutState, clearStorageOnce],
+  );
+
+  const handleAuthErrorRef = useRef<(error: unknown) => Promise<boolean>>(async () => false);
+  handleAuthErrorRef.current = async (error: unknown) => {
+    if (!isInvalidRefreshTokenError(error)) {
+      return false;
+    }
+    await recoverFromInvalidSession(error);
+    return true;
+  };
+
+  const loadUserProfileRef = useRef(loadUserProfile);
+  loadUserProfileRef.current = loadUserProfile;
+
+  const applySignedOutStateRef = useRef(applySignedOutState);
+  applySignedOutStateRef.current = applySignedOutState;
+
+  const applySignedInSessionRef = useRef(applySignedInSession);
+  applySignedInSessionRef.current = applySignedInSession;
 
   useEffect(() => {
     let mounted = true;
+
+    startupLog('AUTH LISTENER CREATED');
 
     const initializeAuth = async () => {
       startupLog('Auth initialization started');
 
       try {
-        const {
-          data: { session: currentSession },
-        } = await withTimeout(
+        const { data, error } = await withTimeout(
           supabase.auth.getSession(),
           STARTUP_AUTH_TIMEOUT_MS,
           'supabase.auth.getSession',
@@ -90,27 +207,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setSession(currentSession);
+        if (error) {
+          if (await handleAuthErrorRef.current(error)) {
+            return;
+          }
+          startupLog('Auth getSession error (continuing signed out)', error);
+          applySignedOutStateRef.current({ showSessionExpired: false });
+          return;
+        }
+
+        const currentSession = data.session;
         startupLog('Session resolved', { hasSession: Boolean(currentSession) });
 
         if (currentSession?.user) {
+          applySignedInSessionRef.current(currentSession);
           try {
             await withTimeout(
-              loadUserProfile(currentSession.user),
+              loadUserProfileRef.current(currentSession.user),
               STARTUP_AUTH_TIMEOUT_MS,
               'fetchProfile',
             );
           } catch (profileError) {
+            if (await handleAuthErrorRef.current(profileError)) {
+              return;
+            }
             startupLog('Profile load failed on startup (continuing)', profileError);
             setUser(currentSession.user);
             setProfile(null);
           }
         } else {
+          signedOutHandledRef.current = true;
           clearAuthState();
         }
       } catch (error) {
-        startupLog('Auth initialization failed (continuing)', error);
+        if (await handleAuthErrorRef.current(error)) {
+          return;
+        }
+        startupLog('Auth initialization failed (continuing signed out)', error);
         if (mounted) {
+          signedOutHandledRef.current = true;
           clearAuthState();
         }
       } finally {
@@ -125,32 +260,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (!mounted) {
+      if (!mounted || recoveringRef.current) {
         return;
       }
 
-      startupLog('Auth state change', { event, hasSession: Boolean(nextSession) });
-      setSession(nextSession);
+      const hasUser = Boolean(nextSession?.user);
 
-      if (!nextSession?.user) {
-        clearAuthState();
+      if (event === 'SIGNED_OUT' && !hasUser) {
+        if (signedOutHandledRef.current) {
+          return;
+        }
+
+        startupLog('Auth state change', { event, hasSession: false });
+
+        applySignedOutStateRef.current({
+          showSessionExpired: hadSessionRef.current && !intentionalLogoutRef.current,
+        });
         return;
       }
 
-      // Defer Supabase calls to avoid deadlocking getSession() during INITIAL_SESSION.
+      if (!hasUser) {
+        if (signedOutHandledRef.current) {
+          return;
+        }
+
+        startupLog('Auth state change', { event, hasSession: false });
+
+        applySignedOutStateRef.current({
+          showSessionExpired:
+            event !== 'INITIAL_SESSION' &&
+            hadSessionRef.current &&
+            !intentionalLogoutRef.current,
+        });
+        return;
+      }
+
+      startupLog('Auth state change', { event, hasSession: true });
+
+      applySignedInSessionRef.current(nextSession);
+
       if (event === 'INITIAL_SESSION') {
         return;
       }
 
       setTimeout(() => {
-        if (!mounted) {
+        if (!mounted || recoveringRef.current) {
           return;
         }
 
         void (async () => {
           try {
-            await loadUserProfile(nextSession.user);
+            await loadUserProfileRef.current(nextSession.user);
           } catch (profileError) {
+            if (await handleAuthErrorRef.current(profileError)) {
+              return;
+            }
             startupLog('Profile load failed on auth event', profileError);
             setUser(nextSession.user);
             setProfile(null);
@@ -170,18 +334,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       clearTimeout(authSafetyTimer);
       subscription.unsubscribe();
+      startupLog('AUTH LISTENER DESTROYED');
     };
-  }, [clearAuthState, finishLoading, loadUserProfile]);
+  }, [clearAuthState, finishLoading]);
 
   const login = useCallback(
     async (email: string, password: string) => {
+      signedOutHandledRef.current = false;
+      storageClearedRef.current = false;
+      hadSessionRef.current = false;
+      queryCacheClearedRef.current = false;
+      sessionExpiredNoticeSetRef.current = false;
+      clearSessionNotice();
       startupLog('Login started');
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
+        if (await handleAuthErrorRef.current(error)) {
+          throw new Error(SESSION_EXPIRED_MESSAGE);
+        }
         throw new Error(error.message);
       }
 
@@ -189,24 +364,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Login failed. No session returned.');
       }
 
-      setSession(data.session);
+      applySignedInSession(data.session);
       await loadUserProfile(data.user);
       startupLog('Login complete');
     },
-    [loadUserProfile],
+    [applySignedInSession, clearSessionNotice, loadUserProfile],
   );
 
   const logout = useCallback(async () => {
+    intentionalLogoutRef.current = true;
+    clearSessionNotice();
     startupLog('Logout started');
-    const { error } = await supabase.auth.signOut();
 
-    if (error) {
-      throw new Error(error.message);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error && !isInvalidRefreshTokenError(error)) {
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      if (!isInvalidRefreshTokenError(error)) {
+        intentionalLogoutRef.current = false;
+        throw error instanceof Error ? error : new Error('Logout failed.');
+      }
+      await clearStorageOnce();
     }
 
-    clearAuthState();
+    applySignedOutState({ showSessionExpired: false });
+    hadSessionRef.current = false;
     startupLog('Logout complete');
-  }, [clearAuthState]);
+  }, [applySignedOutState, clearSessionNotice, clearStorageOnce]);
 
   const value = useMemo(
     () => ({
@@ -214,10 +400,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       loading,
+      sessionNotice,
       login,
       logout,
+      clearSessionNotice,
     }),
-    [session, user, profile, loading, login, logout],
+    [session, user, profile, loading, sessionNotice, login, logout, clearSessionNotice],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

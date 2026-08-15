@@ -2,6 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import {
+  BreakdownChips,
+  breakdownTotal,
+} from '@/src/components/ui/BreakdownChips';
+import { colors, radius, shadows, spacing } from '@/src/constants/theme';
 import type { DocumentCountBreakdown } from '@/src/types/dashboard';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -13,49 +18,46 @@ type SummaryCardProps = {
   tone?: 'default' | 'warning' | 'danger' | 'success';
   subtitle?: string;
   breakdown?: DocumentCountBreakdown;
+  fullWidth?: boolean;
   onPress?: () => void;
 };
 
 const TONE_STYLES = {
   default: {
-    cardBg: '#FFFFFF',
-    cardBorder: '#E5E7EB',
-    iconBg: '#EFF6FF',
-    iconColor: '#2563EB',
-    labelColor: '#2563EB',
-    valueColor: '#111827',
-    subtitleColor: '#6B7280',
-    breakdownColor: '#111827',
+    cardBg: colors.background,
+    cardBorder: colors.border,
+    iconBg: colors.primaryLight,
+    iconColor: colors.primary,
+    labelColor: colors.primary,
+    valueColor: colors.text,
+    subtitleColor: colors.textMuted,
   },
   warning: {
-    cardBg: '#FFF7ED',
+    cardBg: colors.warningLight,
     cardBorder: '#FED7AA',
     iconBg: '#FFEDD5',
-    iconColor: '#EA580C',
+    iconColor: colors.warning,
     labelColor: '#C2410C',
-    valueColor: '#111827',
+    valueColor: colors.text,
     subtitleColor: '#78716C',
-    breakdownColor: '#111827',
   },
   danger: {
-    cardBg: '#FEF2F2',
+    cardBg: colors.dangerLight,
     cardBorder: '#FECACA',
     iconBg: '#FEE2E2',
-    iconColor: '#DC2626',
+    iconColor: colors.danger,
     labelColor: '#B91C1C',
-    valueColor: '#111827',
+    valueColor: colors.text,
     subtitleColor: '#78716C',
-    breakdownColor: '#111827',
   },
   success: {
-    cardBg: '#ECFDF5',
+    cardBg: colors.successLight,
     cardBorder: '#A7F3D0',
     iconBg: '#D1FAE5',
-    iconColor: '#059669',
+    iconColor: colors.success,
     labelColor: '#047857',
-    valueColor: '#111827',
+    valueColor: colors.text,
     subtitleColor: '#047857',
-    breakdownColor: '#111827',
   },
 } as const;
 
@@ -65,7 +67,7 @@ function formatAccessibilityLabel(
   breakdown?: DocumentCountBreakdown,
 ): string {
   if (breakdown) {
-    return `${label}, Staff ${breakdown.staff}, Licenses ${breakdown.licenses}`;
+    return `${label}, total ${breakdownTotal(breakdown)}, Staff ${breakdown.staff}, Licenses ${breakdown.licenses}, Vehicles ${breakdown.vehicles}`;
   }
   return `${label}, ${value ?? ''}`;
 }
@@ -77,45 +79,38 @@ export function SummaryCard({
   tone = 'default',
   subtitle,
   breakdown,
+  fullWidth = false,
   onPress,
 }: SummaryCardProps) {
   const toneStyle = TONE_STYLES[tone];
-
-  const cardSurfaceStyle = {
-    backgroundColor: toneStyle.cardBg,
-    borderColor: toneStyle.cardBorder,
-  };
+  const total = breakdown ? breakdownTotal(breakdown) : null;
 
   const content = (
     <>
       <View style={styles.header}>
-        <Text style={[styles.label, { color: toneStyle.labelColor }]}>{label}</Text>
-        <View style={styles.headerRight}>
-          <View style={[styles.iconWrap, { backgroundColor: toneStyle.iconBg }]}>
-            <Ionicons name={icon} size={20} color={toneStyle.iconColor} />
-          </View>
-          {onPress ? (
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={toneStyle.labelColor}
-              style={styles.chevron}
-            />
+        <View style={[styles.iconWrap, { backgroundColor: toneStyle.iconBg }]}>
+          <Ionicons name={icon} size={22} color={toneStyle.iconColor} />
+        </View>
+        <View style={styles.headerText}>
+          <Text style={[styles.label, { color: toneStyle.labelColor }]}>{label}</Text>
+          {total !== null ? (
+            <Text style={[styles.value, { color: toneStyle.valueColor }]}>
+              {total.toLocaleString()}
+            </Text>
+          ) : value ? (
+            <Text
+              style={[styles.value, { color: toneStyle.valueColor }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}>
+              {value}
+            </Text>
           ) : null}
         </View>
       </View>
 
       {breakdown ? (
-        <View style={styles.breakdown}>
-          <Text style={[styles.breakdownLine, { color: toneStyle.breakdownColor }]}>
-            Staff: {breakdown.staff.toLocaleString()}
-          </Text>
-          <Text style={[styles.breakdownLine, { color: toneStyle.breakdownColor }]}>
-            Licenses: {breakdown.licenses.toLocaleString()}
-          </Text>
-        </View>
-      ) : value ? (
-        <Text style={[styles.value, { color: toneStyle.valueColor }]}>{value}</Text>
+        <BreakdownChips breakdown={breakdown} tone={tone === 'default' ? 'default' : tone} />
       ) : null}
 
       {subtitle ? (
@@ -124,6 +119,11 @@ export function SummaryCard({
     </>
   );
 
+  const cardSurfaceStyle = {
+    backgroundColor: toneStyle.cardBg,
+    borderColor: toneStyle.cardBorder,
+  };
+
   const accessibilityLabel = formatAccessibilityLabel(label, value, breakdown);
 
   if (onPress) {
@@ -131,8 +131,8 @@ export function SummaryCard({
       <Pressable
         style={({ pressed }) => [
           styles.card,
+          fullWidth && styles.cardFull,
           cardSurfaceStyle,
-          styles.cardPressable,
           pressed && styles.cardPressed,
         ]}
         onPress={onPress}
@@ -143,73 +143,60 @@ export function SummaryCard({
     );
   }
 
-  return <View style={[styles.card, cardSurfaceStyle]}>{content}</View>;
+  return (
+    <View style={[styles.card, fullWidth && styles.cardFull, cardSurfaceStyle]}>{content}</View>
+  );
 }
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
     minWidth: '46%',
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    padding: 16,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadows.cardSoft,
   },
-  cardPressable: {
-    borderColor: '#DBEAFE',
+  cardFull: {
+    flex: undefined,
+    minWidth: '100%',
+    width: '100%',
   },
   cardPressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.98 }],
+    transform: [{ scale: 0.99 }],
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  headerRight: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  chevron: {
-    opacity: 0.55,
-  },
-  label: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    paddingRight: 8,
+    gap: spacing.md,
   },
   iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
   value: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  breakdown: {
-    gap: 4,
-  },
-  breakdownLine: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.8,
   },
   subtitle: {
-    marginTop: 4,
     fontSize: 12,
+    lineHeight: 17,
   },
 });

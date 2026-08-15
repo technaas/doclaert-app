@@ -4,8 +4,10 @@ import { useCompanyDocumentsQuery } from '@/src/hooks/queries/useCompanyDocument
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
+import type { VehicleRecord } from '@/src/types/vehicles';
 
 const EMPTY_DOCS: DocumentRecord[] = [];
+const EMPTY_VEHICLES: VehicleRecord[] = [];
 const EMPTY_BRANDS: Brand[] = [];
 const EMPTY_BRANCHES: Branch[] = [];
 const EMPTY_STAFF: StaffMember[] = [];
@@ -35,6 +37,7 @@ export function useDocumentsData(companyId: string | undefined) {
 
   return {
     documents: data?.documents ?? EMPTY_DOCS,
+    vehicles: data?.vehicles ?? EMPTY_VEHICLES,
     brands: data?.brands ?? EMPTY_BRANDS,
     branches: data?.branches ?? EMPTY_BRANCHES,
     staffById,

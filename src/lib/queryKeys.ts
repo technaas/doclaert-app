@@ -9,6 +9,7 @@ export const queryKeys = {
   dashboard: (companyId: string) => ['company', companyId, 'dashboard'] as const,
   staff: (companyId: string) => ['company', companyId, 'staff'] as const,
   documents: (companyId: string) => ['company', companyId, 'documents'] as const,
+  vehicles: (companyId: string) => ['company', companyId, 'vehicles'] as const,
   org: (companyId: string) => ['company', companyId, 'org'] as const,
   staffMember: (companyId: string, staffId: string) =>
     ['company', companyId, 'staff', staffId] as const,
@@ -16,6 +17,8 @@ export const queryKeys = {
     ['company', companyId, 'staff', staffId, 'documents'] as const,
   document: (companyId: string, documentId: string) =>
     ['company', companyId, 'document', documentId] as const,
+  vehicle: (companyId: string, vehicleId: string) =>
+    ['company', companyId, 'vehicle', vehicleId] as const,
   notificationLogs: (
     companyId: string,
     statusFilter: MobileNotificationLogStatusFilter,

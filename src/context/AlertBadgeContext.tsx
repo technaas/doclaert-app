@@ -29,6 +29,7 @@ export function AlertBadgeProvider({ children }: { children: ReactNode }) {
     return countDocumentAlerts(
       query.data.documents,
       query.data.alertThresholdDays,
+      query.data.vehicles,
     );
   }, [query.data]);
 

@@ -1,8 +1,7 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
-
+import { FilterBar } from '@/src/components/ui/FilterBar';
 import { FilterSelect, type FilterOption } from '@/src/components/ui/FilterSelect';
-import { spacing } from '@/src/constants/theme';
 import type { StaffFilters } from '@/src/types/filters';
+import { DEFAULT_STAFF_FILTERS } from '@/src/types/filters';
 import type { Branch, Brand } from '@/src/types/staff';
 
 const STATUS_OPTIONS: FilterOption[] = [
@@ -12,7 +11,7 @@ const STATUS_OPTIONS: FilterOption[] = [
 ];
 
 const STAFF_TYPE_OPTIONS: FilterOption[] = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All types' },
   { value: 'Full Time', label: 'Full Time' },
   { value: 'Part Time', label: 'Part Time' },
   { value: 'Both', label: 'Both' },
@@ -26,6 +25,16 @@ type StaffFiltersBarProps = {
   roles: string[];
   showRole?: boolean;
 };
+
+function hasActiveFilters(filters: StaffFilters): boolean {
+  return (
+    filters.brandId !== DEFAULT_STAFF_FILTERS.brandId ||
+    filters.branchId !== DEFAULT_STAFF_FILTERS.branchId ||
+    filters.status !== DEFAULT_STAFF_FILTERS.status ||
+    filters.staffType !== DEFAULT_STAFF_FILTERS.staffType ||
+    filters.role !== DEFAULT_STAFF_FILTERS.role
+  );
+}
 
 export function StaffFiltersBar({
   filters,
@@ -56,10 +65,17 @@ export function StaffFiltersBar({
   ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}>
+    <FilterBar
+      showReset={hasActiveFilters(filters)}
+      onReset={() =>
+        onChange({
+          brandId: 'all',
+          branchId: 'all',
+          status: 'all',
+          staffType: 'all',
+          role: 'all',
+        })
+      }>
       <FilterSelect
         label="Brand"
         value={filters.brandId}
@@ -97,14 +113,6 @@ export function StaffFiltersBar({
           onChange={(role) => onChange({ role })}
         />
       ) : null}
-    </ScrollView>
+    </FilterBar>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-});

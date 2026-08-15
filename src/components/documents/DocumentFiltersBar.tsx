@@ -1,13 +1,12 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
-
+import { FilterBar } from '@/src/components/ui/FilterBar';
 import { FilterSelect, type FilterOption } from '@/src/components/ui/FilterSelect';
-import { spacing } from '@/src/constants/theme';
 import type { DocumentFilters } from '@/src/types/documents';
+import { DEFAULT_DOCUMENT_FILTERS } from '@/src/types/documents';
 import type { Branch, Brand } from '@/src/types/staff';
 
 const STATUS_OPTIONS: FilterOption[] = [
   { value: 'all', label: 'All statuses' },
-  { value: 'active', label: 'Active' },
+  { value: 'active', label: 'Valid' },
   { value: 'expiring', label: 'Expiring Soon' },
   { value: 'expired', label: 'Expired' },
 ];
@@ -18,6 +17,14 @@ type DocumentFiltersBarProps = {
   brands: Brand[];
   branches: Branch[];
 };
+
+function hasActiveFilters(filters: DocumentFilters): boolean {
+  return (
+    filters.brandId !== DEFAULT_DOCUMENT_FILTERS.brandId ||
+    filters.branchId !== DEFAULT_DOCUMENT_FILTERS.branchId ||
+    filters.status !== DEFAULT_DOCUMENT_FILTERS.status
+  );
+}
 
 export function DocumentFiltersBar({
   filters,
@@ -41,10 +48,15 @@ export function DocumentFiltersBar({
   ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}>
+    <FilterBar
+      showReset={hasActiveFilters(filters)}
+      onReset={() =>
+        onChange({
+          brandId: 'all',
+          branchId: 'all',
+          status: 'all',
+        })
+      }>
       <FilterSelect
         label="Brand"
         value={filters.brandId}
@@ -63,14 +75,6 @@ export function DocumentFiltersBar({
         options={STATUS_OPTIONS}
         onChange={(status) => onChange({ status })}
       />
-    </ScrollView>
+    </FilterBar>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-});

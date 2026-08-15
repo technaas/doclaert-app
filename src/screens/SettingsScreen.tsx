@@ -351,9 +351,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderLight,
   },
   rowLabel: {
-    fontSize: 14,
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.textMuted,
     flex: 1,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   rowValue: {
     flex: 1,

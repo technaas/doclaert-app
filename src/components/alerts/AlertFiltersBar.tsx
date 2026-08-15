@@ -1,11 +1,11 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
-
-import { DocumentTabBar } from '@/src/components/documents/DocumentTabBar';
+import { FilterBar } from '@/src/components/ui/FilterBar';
 import { FilterSelect, type FilterOption } from '@/src/components/ui/FilterSelect';
+import { DocumentTabBar } from '@/src/components/documents/DocumentTabBar';
 import { spacing } from '@/src/constants/theme';
 import type { AlertFilters } from '@/src/types/alerts';
-import type { DocumentTab } from '@/src/types/documents';
+import { DEFAULT_ALERT_FILTERS } from '@/src/types/alerts';
 import type { Branch, Brand } from '@/src/types/staff';
+import { StyleSheet, View } from 'react-native';
 
 const STATUS_OPTIONS: FilterOption[] = [
   { value: 'all', label: 'All statuses' },
@@ -19,6 +19,15 @@ type AlertFiltersBarProps = {
   brands: Brand[];
   branches: Branch[];
 };
+
+function hasActiveFilters(filters: AlertFilters): boolean {
+  return (
+    filters.brandId !== DEFAULT_ALERT_FILTERS.brandId ||
+    filters.branchId !== DEFAULT_ALERT_FILTERS.branchId ||
+    filters.status !== DEFAULT_ALERT_FILTERS.status ||
+    filters.tab !== DEFAULT_ALERT_FILTERS.tab
+  );
+}
 
 export function AlertFiltersBar({
   filters,
@@ -44,13 +53,19 @@ export function AlertFiltersBar({
   return (
     <View style={styles.wrap}>
       <DocumentTabBar
-        value={filters.tab as DocumentTab}
+        value={filters.tab}
         onChange={(tab) => onChange({ tab })}
       />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}>
+      <FilterBar
+        showReset={hasActiveFilters(filters)}
+        onReset={() =>
+          onChange({
+            brandId: 'all',
+            branchId: 'all',
+            status: 'all',
+            tab: 'all',
+          })
+        }>
         <FilterSelect
           label="Brand"
           value={filters.brandId}
@@ -69,7 +84,7 @@ export function AlertFiltersBar({
           options={STATUS_OPTIONS}
           onChange={(status) => onChange({ status: status as AlertFilters['status'] })}
         />
-      </ScrollView>
+      </FilterBar>
     </View>
   );
 }
@@ -77,10 +92,5 @@ export function AlertFiltersBar({
 const styles = StyleSheet.create({
   wrap: {
     gap: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
   },
 });

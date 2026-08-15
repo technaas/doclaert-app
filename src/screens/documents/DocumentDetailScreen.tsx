@@ -145,7 +145,13 @@ export function DocumentDetailScreen({ route }: Props) {
         <DetailRow label="Document name" value={getDocumentLabel(document.document_name)} />
         <DetailRow
           label="Type"
-          value={document.type === 'staff' ? 'Staff Document' : 'Branch License'}
+          value={
+            document.type === 'staff'
+              ? 'Staff Document'
+              : document.type === 'branch'
+                ? 'Branch License'
+                : 'Vehicle Daftar'
+          }
         />
         <View style={styles.statusRow}>
           <Text style={styles.statusLabel}>Status</Text>

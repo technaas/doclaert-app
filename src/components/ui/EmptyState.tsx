@@ -20,7 +20,7 @@ export function EmptyState({
   return (
     <View style={styles.wrap}>
       <View style={styles.iconCircle}>
-        <Ionicons name={icon} size={28} color={colors.primary} />
+        <Ionicons name={icon} size={32} color={colors.primary} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
@@ -35,10 +35,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
+    backgroundColor: colors.surface,
   },
   iconCircle: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     borderRadius: radius.full,
     backgroundColor: colors.primaryLight,
     alignItems: 'center',
@@ -46,7 +47,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   title: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
@@ -56,6 +57,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 21,
-    maxWidth: 300,
+    maxWidth: 280,
   },
 });

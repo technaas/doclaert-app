@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { SalaryTypeBadge } from '@/src/components/salary/SalaryTypeBadge';
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { colors, radius, shadows, spacing } from '@/src/constants/theme';
 import { formatPay } from '@/src/lib/format';
 import { formatStaffType } from '@/src/lib/staffDisplay';
 import type { StaffListItem } from '@/src/types/staff';
@@ -50,6 +50,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.md,
+    ...shadows.cardSoft,
   },
   header: {
     flexDirection: 'row',
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
     minWidth: 92,
   },
   salaryLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: colors.textMuted,
     textTransform: 'uppercase',
@@ -92,19 +93,19 @@ const styles = StyleSheet.create({
   },
   salaryAmount: {
     marginTop: 2,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
     color: colors.primary,
     letterSpacing: -0.3,
   },
   meta: {
     marginTop: spacing.sm,
-    fontSize: 13,
-    color: colors.textMuted,
+    fontSize: 12,
+    color: colors.textSubtle,
   },
   role: {
     marginTop: 4,
     fontSize: 13,
-    color: colors.textSubtle,
+    color: colors.textMuted,
   },
 });

@@ -1,12 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { SegmentedTabs } from '@/src/components/ui/SegmentedTabs';
 import type { DocumentTab } from '@/src/types/documents';
 
-const TABS: { key: DocumentTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'staff', label: 'Staff Documents' },
-  { key: 'branch', label: 'Branch Licenses' },
+const TABS = [
+  { key: 'all' as const, label: 'All' },
+  { key: 'staff' as const, label: 'Staff' },
+  { key: 'branch' as const, label: 'Licenses' },
+  { key: 'vehicle' as const, label: 'Vehicles' },
 ];
 
 type DocumentTabBarProps = {
@@ -15,51 +14,7 @@ type DocumentTabBarProps = {
 };
 
 export function DocumentTabBar({ value, onChange }: DocumentTabBarProps) {
-  return (
-    <View style={styles.wrap}>
-      {TABS.map((tab) => {
-        const active = tab.key === value;
-        return (
-          <Pressable
-            key={tab.key}
-            style={[styles.tab, active && styles.tabActive]}
-            onPress={() => onChange(tab.key)}>
-            <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  return <SegmentedTabs tabs={TABS} value={value} onChange={onChange} />;
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  tab: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  tabTextActive: {
-    color: colors.primary,
-  },
-});
+export { SegmentedTabs };

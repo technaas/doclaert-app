@@ -10,6 +10,11 @@ export type {
 export type { AlertFilters, AlertListItem, AlertUrgencyGroup } from './alerts';
 export type { Brand, Branch, StaffMember, StaffListItem, StaffDocument } from './staff';
 export type {
+  VehicleRecord,
+  VehicleListItem,
+  VehicleFilters,
+} from './vehicles';
+export type {
   DeviceRegistrationInfo,
   MobileDeviceRecord,
   NotificationPermissionStatus,

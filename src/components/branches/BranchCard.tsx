@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { colors, spacing } from '@/src/constants/theme';
 import { formatCount } from '@/src/lib/format';
 import type { BranchListItem } from '@/src/types/branch';
 
@@ -14,100 +14,75 @@ type BranchCardProps = {
 
 function BranchCardComponent({ branch, onPress }: BranchCardProps) {
   const statusTone =
-    (branch.status ?? '') === 'active'
+    (branch.status ?? '').toLowerCase() === 'active'
       ? 'success'
-      : (branch.status ?? '') === 'inactive'
-        ? 'muted'
+      : (branch.status ?? '').toLowerCase() === 'inactive'
+        ? 'neutral'
         : 'default';
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.header}>
-        <View style={styles.titleWrap}>
-          <Text style={styles.name}>{branch.name}</Text>
-          <Text style={styles.brand}>{branch.brandName}</Text>
+    <ListCard
+      title={branch.name}
+      subtitle={branch.brandName}
+      meta={[branch.location, branch.manager_name].filter(Boolean).join(' · ') || undefined}
+      onPress={onPress}
+      badges={<StatusBadge label={branch.status ?? '—'} tone={statusTone} size="sm" />}
+      footer={
+        <View style={styles.statsGrid}>
+          <StatPill label="Staff" value={formatCount(branch.staffCount)} />
+          <StatPill label="Licenses" value={formatCount(branch.licensesCount)} />
+          <StatPill label="Expiring" value={formatCount(branch.expiringLicensesCount)} tone="warning" />
+          <StatPill label="Expired" value={formatCount(branch.expiredLicensesCount)} tone="danger" />
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
-      </View>
+      }
+    />
+  );
+}
 
-      <Text style={styles.meta}>Location: {branch.location ?? '—'}</Text>
-      <Text style={styles.meta}>Manager: {branch.manager_name ?? '—'}</Text>
-      <Text style={styles.meta}>Contact: {branch.manager_contact ?? '—'}</Text>
+function StatPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'warning' | 'danger';
+}) {
+  const valueColor =
+    tone === 'warning' ? colors.warning : tone === 'danger' ? colors.danger : colors.text;
 
-      <View style={styles.row}>
-        <StatusBadge label={branch.status ?? '—'} tone={statusTone} />
-      </View>
-
-      <View style={styles.stats}>
-        <Text style={styles.stat}>Staff: {formatCount(branch.staffCount)}</Text>
-        <Text style={styles.stat}>Licenses: {formatCount(branch.licensesCount)}</Text>
-      </View>
-
-      <View style={styles.stats}>
-        <Text style={[styles.stat, styles.warning]}>
-          Expiring: {formatCount(branch.expiringLicensesCount)}
-        </Text>
-        <Text style={[styles.stat, styles.danger]}>
-          Expired: {formatCount(branch.expiredLicensesCount)}
-        </Text>
-      </View>
-    </Pressable>
+  return (
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text style={[styles.pillValue, { color: valueColor }]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  header: {
+  statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
-  titleWrap: {
-    flex: 1,
-    paddingRight: spacing.sm,
+  pill: {
+    minWidth: '46%',
+    flexGrow: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
   },
-  name: {
-    fontSize: 17,
+  pillLabel: {
+    fontSize: 10,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
   },
-  brand: {
+  pillValue: {
     marginTop: 2,
-    fontSize: 13,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  meta: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 2,
-  },
-  row: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  stat: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  warning: {
-    color: colors.warning,
-  },
-  danger: {
-    color: colors.danger,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 

@@ -1,4 +1,9 @@
-import { countDocumentsByStatus } from '@/src/lib/documentCounts';
+import {
+  countDocumentsByStatus,
+  countVehicleDaftarByStatus,
+  mergeDocumentCountBreakdowns,
+} from '@/src/lib/documentCounts';
+import { mapVehicleRecord } from '@/src/lib/vehicleFields';
 import { supabase } from '@/src/lib/supabase';
 import type { DashboardStats } from '@/src/types/dashboard';
 
@@ -42,6 +47,7 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
     branchesResult,
     staffResult,
     documentsResult,
+    vehiclesResult,
   ] = await Promise.all([
     fetchAlertThresholdDays(companyId),
     fetchCompanyName(companyId),
@@ -63,6 +69,7 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
       .select('expiry_date, type')
       .eq('company_id', companyId)
       .not('expiry_date', 'is', null),
+    supabase.from('vehicles').select('*').eq('company_id', companyId),
   ]);
 
   if (brandsResult.error) {
@@ -77,6 +84,7 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
   if (documentsResult.error) {
     throw new Error(documentsResult.error.message);
   }
+  const vehicleRows = vehiclesResult.error ? [] : (vehiclesResult.data ?? []);
 
   const activeStaff = staffResult.data ?? [];
   const totalPay = activeStaff.reduce(
@@ -84,9 +92,12 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
     0,
   );
 
-  const documentCounts = countDocumentsByStatus(
-    documentsResult.data ?? [],
-    alertThresholdDays,
+  const documentCounts = mergeDocumentCountBreakdowns(
+    countDocumentsByStatus(documentsResult.data ?? [], alertThresholdDays),
+    countVehicleDaftarByStatus(
+      vehicleRows.map((row) => mapVehicleRecord(row as Record<string, unknown>)),
+      alertThresholdDays,
+    ),
   );
 
   return {
@@ -94,6 +105,7 @@ export async function fetchDashboardStats(companyId: string): Promise<DashboardS
     branchesCount: branchesResult.count ?? 0,
     activeStaffCount: activeStaff.length,
     totalPay,
+    vehiclesCount: vehicleRows.length,
     validDocuments: documentCounts.valid,
     expiringSoon: documentCounts.expiringSoon,
     expired: documentCounts.expired,

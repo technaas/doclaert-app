@@ -16,7 +16,7 @@ export function getDocumentDisplayStatus(
 }
 
 export const DOCUMENT_STATUS_LABEL: Record<DocumentDisplayStatus, string> = {
-  active: 'Active',
+  active: 'Valid',
   expiring: 'Expiring Soon',
   expired: 'Expired',
 };

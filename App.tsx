@@ -3,6 +3,7 @@ import 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -10,6 +11,7 @@ import { AlertBadgeProvider } from '@/src/context/AlertBadgeContext';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
 import { NotificationProvider } from '@/src/context/NotificationContext';
 import { QueryProvider } from '@/src/providers/QueryProvider';
+import { isInvalidRefreshTokenMessage } from '@/src/lib/authSession';
 import { configureNotifications } from '@/src/lib/notifications';
 import {
   STARTUP_SPLASH_TIMEOUT_MS,
@@ -22,6 +24,38 @@ import {
 import { RootNavigator } from '@/src/navigation/RootNavigator';
 
 startupLog('App module loaded');
+
+LogBox.ignoreLogs([
+  'Invalid Refresh Token',
+  'Refresh Token Not Found',
+  'AuthApiError',
+]);
+
+const originalConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  const text = args
+    .map((arg) => {
+      if (arg instanceof Error) {
+        return arg.message;
+      }
+      if (typeof arg === 'string') {
+        return arg;
+      }
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    })
+    .join(' ');
+
+  if (isInvalidRefreshTokenMessage(text)) {
+    startupLog('Suppressed expected auth refresh error');
+    return;
+  }
+
+  originalConsoleError(...args);
+};
 
 void SplashScreen.preventAutoHideAsync().catch((error) => {
   startupLog('preventAutoHideAsync skipped', error);

@@ -1,7 +1,9 @@
 import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import { supabase } from '@/src/lib/supabase';
+import { fetchCompanyVehicles } from '@/src/services/vehicles';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
+import type { VehicleRecord } from '@/src/types/vehicles';
 import { fetchCompanyStaffData } from '@/src/services/staff';
 
 const DEFAULT_ALERT_THRESHOLD_DAYS = 30;
@@ -33,6 +35,7 @@ function mapDocumentRecord(row: Record<string, unknown>): DocumentRecord {
 
 export type CompanyDocumentsData = {
   documents: DocumentRecord[];
+  vehicles: VehicleRecord[];
   brands: Brand[];
   branches: Branch[];
   staff: StaffMember[];
@@ -59,9 +62,10 @@ export async function fetchAlertThresholdDays(companyId: string): Promise<number
 export async function fetchCompanyDocumentsData(
   companyId: string,
 ): Promise<CompanyDocumentsData> {
-  const [lookups, documentsResult, alertThresholdDays] = await Promise.all([
+  const [lookups, documentsResult, vehicles, alertThresholdDays] = await Promise.all([
     fetchCompanyStaffData(companyId),
     supabase.from('documents').select(DOCUMENT_COLUMNS).eq('company_id', companyId),
+    fetchCompanyVehicles(companyId),
     fetchAlertThresholdDays(companyId),
   ]);
 
@@ -75,6 +79,7 @@ export async function fetchCompanyDocumentsData(
 
   return {
     documents,
+    vehicles,
     brands: lookups.brands,
     branches: lookups.branches,
     staff: lookups.staff,

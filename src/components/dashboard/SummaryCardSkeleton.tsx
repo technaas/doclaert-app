@@ -1,8 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 
-export function SummaryCardSkeleton() {
+import { radius, spacing } from '@/src/constants/theme';
+
+type SummaryCardSkeletonProps = {
+  fullWidth?: boolean;
+};
+
+export function SummaryCardSkeleton({ fullWidth = false }: SummaryCardSkeletonProps) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, fullWidth && styles.cardFull]}>
       <View style={styles.row}>
         <View style={[styles.block, styles.label]} />
         <View style={[styles.block, styles.icon]} />
@@ -17,10 +23,15 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '46%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    padding: 16,
+    padding: spacing.lg,
+  },
+  cardFull: {
+    flex: undefined,
+    minWidth: '100%',
+    width: '100%',
   },
   row: {
     flexDirection: 'row',

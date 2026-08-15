@@ -78,7 +78,7 @@ export function StaffScreen({ navigation, route }: Props) {
   };
 
   return (
-    <AppScreenLayout title="Staff" subtitle="Read-only staff directory">
+    <AppScreenLayout title="Staff" subtitle="Company staff directory">
       <View style={styles.filtersWrap}>
         <StaffSummaryStrip
           total={summaryCounts.total}

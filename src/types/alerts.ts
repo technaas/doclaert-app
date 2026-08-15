@@ -21,11 +21,12 @@ export type AlertListItem = {
   daysRemaining: number | null;
   displayStatus: DocumentDisplayStatus;
   urgencyGroup: AlertUrgencyGroup;
+  plateNumber?: string | null;
 };
 
 export type AlertFilters = {
   search: string;
-  tab: 'all' | 'staff' | 'branch';
+  tab: 'all' | 'staff' | 'branch' | 'vehicle';
   brandId: string;
   branchId: string;
   status: 'all' | 'expiring' | 'expired';

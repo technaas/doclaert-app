@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 
 import { AppScreenLayout } from '@/src/components/layout/AppScreenLayout';
+import { PeoplePayrollCard } from '@/src/components/dashboard/PeoplePayrollCard';
+import { PeoplePayrollCardSkeleton } from '@/src/components/dashboard/PeoplePayrollCardSkeleton';
 import { SummaryCard } from '@/src/components/dashboard/SummaryCard';
 import { SummaryCardSkeleton } from '@/src/components/dashboard/SummaryCardSkeleton';
 import { cardStyle, colors, spacing, typography } from '@/src/constants/theme';
@@ -21,10 +23,6 @@ import { getQueryScreenState } from '@/src/lib/queryScreenState';
 import { totalBreakdown } from '@/src/types/dashboard';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { MainTabParamList } from '@/src/navigation/MainTabNavigator';
-
-function formatPay(amount: number): string {
-  return `KWD ${amount.toFixed(3)}`;
-}
 
 function formatCount(count: number): string {
   return count.toLocaleString();
@@ -68,6 +66,12 @@ export function DashboardScreen() {
     });
   };
 
+  const openFleet = () => {
+    navigation.navigate('Vehicles', {
+      screen: 'VehiclesList',
+    });
+  };
+
   const error = companyId ? errorMessage : 'Company not found on your profile.';
 
   const isEmpty =
@@ -77,6 +81,7 @@ export function DashboardScreen() {
     stats.brandsCount === 0 &&
     stats.branchesCount === 0 &&
     stats.activeStaffCount === 0 &&
+    stats.vehiclesCount === 0 &&
     totalBreakdown(stats.validDocuments) === 0 &&
     totalBreakdown(stats.expiringSoon) === 0 &&
     totalBreakdown(stats.expired) === 0;
@@ -102,14 +107,26 @@ export function DashboardScreen() {
           />
         }>
         {isInitialLoading ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Overview</Text>
-            <View style={styles.grid}>
-              {Array.from({ length: 6 }).map((_, index) => (
-                <SummaryCardSkeleton key={index} />
-              ))}
+          <>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Organization</Text>
+              <SummaryCardSkeleton fullWidth />
             </View>
-          </View>
+            <View style={styles.section}>
+              <PeoplePayrollCardSkeleton />
+            </View>
+            <View style={styles.section}>
+              <SummaryCardSkeleton fullWidth />
+            </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Document compliance</Text>
+              <View style={styles.stack}>
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <SummaryCardSkeleton key={index} fullWidth />
+                ))}
+              </View>
+            </View>
+          </>
         ) : null}
 
         {error && !stats ? (
@@ -138,45 +155,45 @@ export function DashboardScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Organization</Text>
-              <View style={styles.grid}>
-                <SummaryCard
-                  label="Brands & Branches"
-                  value={`${formatCount(stats.brandsCount)} / ${formatCount(stats.branchesCount)}`}
-                  icon="business-outline"
-                  subtitle={`${formatCount(stats.brandsCount)} brands · ${formatCount(stats.branchesCount)} branches`}
-                  onPress={() => openAppScreen('Brands')}
-                />
-              </View>
+              <SummaryCard
+                label="Brands & Branches"
+                value={`${formatCount(stats.brandsCount)} / ${formatCount(stats.branchesCount)}`}
+                icon="business-outline"
+                subtitle={`${formatCount(stats.brandsCount)} brands · ${formatCount(stats.branchesCount)} branches`}
+                fullWidth
+                onPress={() => openAppScreen('Brands')}
+              />
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>People & payroll</Text>
-              <View style={styles.grid}>
-                <SummaryCard
-                  label="Active Staff"
-                  value={formatCount(stats.activeStaffCount)}
-                  icon="people-outline"
-                  tone="success"
-                  onPress={openStaffActive}
-                />
-                <SummaryCard
-                  label="Total Pay"
-                  value={formatPay(stats.totalPay)}
-                  icon="wallet-outline"
-                  subtitle="Active staff salaries"
-                  onPress={openSalary}
-                />
-              </View>
+              <PeoplePayrollCard
+                activeStaffCount={stats.activeStaffCount}
+                totalPay={stats.totalPay}
+                onPressActiveStaff={openStaffActive}
+                onPressTotalPay={openSalary}
+              />
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Document alerts</Text>
-              <View style={styles.grid}>
+              <SummaryCard
+                label="Fleet"
+                value={formatCount(stats.vehiclesCount)}
+                icon="car-outline"
+                subtitle="Vehicles"
+                fullWidth
+                onPress={openFleet}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Document compliance</Text>
+              <View style={styles.stack}>
                 <SummaryCard
                   label="Valid Documents"
                   icon="checkmark-circle-outline"
                   tone="success"
                   breakdown={stats.validDocuments}
+                  fullWidth
                   onPress={() => openDocuments('active')}
                 />
                 <SummaryCard
@@ -185,6 +202,7 @@ export function DashboardScreen() {
                   tone="warning"
                   breakdown={stats.expiringSoon}
                   subtitle={`Within ${stats.alertThresholdDays} days`}
+                  fullWidth
                   onPress={() => openDocuments('expiring')}
                 />
                 <SummaryCard
@@ -192,7 +210,8 @@ export function DashboardScreen() {
                   icon="close-circle-outline"
                   tone="danger"
                   breakdown={stats.expired}
-                  subtitle="Past expiry date"
+                  subtitle="Requires immediate attention"
+                  fullWidth
                   onPress={() => openDocuments('expired')}
                 />
               </View>
@@ -218,9 +237,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  stack: {
     gap: spacing.md,
   },
   stateCard: {

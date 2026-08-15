@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
-import { colors, radius, spacing } from '@/src/constants/theme';
+import { colors, spacing } from '@/src/constants/theme';
 import { formatCount } from '@/src/lib/format';
 import type { BrandListItem } from '@/src/types/brand';
 
@@ -14,87 +14,74 @@ type BrandCardProps = {
 
 function BrandCardComponent({ brand, onPress }: BrandCardProps) {
   const statusTone =
-    (brand.status ?? '') === 'active'
+    (brand.status ?? '').toLowerCase() === 'active'
       ? 'success'
-      : (brand.status ?? '') === 'inactive'
-        ? 'muted'
+      : (brand.status ?? '').toLowerCase() === 'inactive'
+        ? 'neutral'
         : 'default';
 
   return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.header}>
-        <Text style={styles.name}>{brand.name}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
-      </View>
+    <ListCard
+      title={brand.name}
+      subtitle={brand.contact_number ?? 'No contact number'}
+      onPress={onPress}
+      badges={<StatusBadge label={brand.status ?? '—'} tone={statusTone} size="sm" />}
+      footer={
+        <View style={styles.statsGrid}>
+          <StatPill label="Branches" value={formatCount(brand.branchCount)} />
+          <StatPill label="Staff" value={formatCount(brand.staffCount)} />
+          <StatPill label="Expiring" value={formatCount(brand.expiringDocsCount)} tone="warning" />
+          <StatPill label="Expired" value={formatCount(brand.expiredDocsCount)} tone="danger" />
+        </View>
+      }
+    />
+  );
+}
 
-      <Text style={styles.contact}>{brand.contact_number ?? 'No contact number'}</Text>
+function StatPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'warning' | 'danger';
+}) {
+  const valueColor =
+    tone === 'warning' ? colors.warning : tone === 'danger' ? colors.danger : colors.text;
 
-      <View style={styles.row}>
-        <StatusBadge label={brand.status ?? '—'} tone={statusTone} />
-      </View>
-
-      <View style={styles.stats}>
-        <Text style={styles.stat}>Branches: {formatCount(brand.branchCount)}</Text>
-        <Text style={styles.stat}>Staff: {formatCount(brand.staffCount)}</Text>
-      </View>
-
-      <View style={styles.stats}>
-        <Text style={[styles.stat, styles.warning]}>
-          Expiring: {formatCount(brand.expiringDocsCount)}
-        </Text>
-        <Text style={[styles.stat, styles.danger]}>
-          Expired: {formatCount(brand.expiredDocsCount)}
-        </Text>
-      </View>
-    </Pressable>
+  return (
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text style={[styles.pillValue, { color: valueColor }]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  header: {
+  statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
-  name: {
-    fontSize: 17,
+  pill: {
+    minWidth: '46%',
+    flexGrow: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  pillLabel: {
+    fontSize: 10,
     fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-    paddingRight: spacing.sm,
-  },
-  contact: {
-    fontSize: 13,
     color: colors.textMuted,
-    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
   },
-  row: {
-    marginBottom: spacing.sm,
-  },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  stat: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: '600',
-  },
-  warning: {
-    color: colors.warning,
-  },
-  danger: {
-    color: colors.danger,
+  pillValue: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 

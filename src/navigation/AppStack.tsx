@@ -9,6 +9,7 @@ import { BrandsScreen } from '@/src/screens/brands/BrandsScreen';
 import { BranchDetailScreen } from '@/src/screens/branches/BranchDetailScreen';
 import { BranchesScreen } from '@/src/screens/branches/BranchesScreen';
 import { DocumentDetailScreen } from '@/src/screens/documents/DocumentDetailScreen';
+import { VehicleDetailScreen } from '@/src/screens/vehicles/VehicleDetailScreen';
 
 export type AppStackParamList = {
   MainTabs: undefined;
@@ -23,6 +24,7 @@ export type AppStackParamList = {
   Branches: undefined;
   BranchDetail: { branchId: string };
   DocumentDetail: { documentId: string };
+  VehicleDetail: { vehicleId: string };
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -54,6 +56,14 @@ export function AppStack() {
         options={{
           ...modalScreenOptions,
           title: 'Document Details',
+        }}
+      />
+      <Stack.Screen
+        name="VehicleDetail"
+        component={VehicleDetailScreen}
+        options={{
+          ...modalScreenOptions,
+          title: 'Vehicle Details',
         }}
       />
     </Stack.Navigator>

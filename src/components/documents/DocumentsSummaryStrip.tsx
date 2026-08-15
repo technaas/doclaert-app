@@ -71,7 +71,7 @@ export function DocumentsSummaryStrip({
 }: DocumentsSummaryStripProps) {
   return (
     <View style={styles.row}>
-      <CompactStatCard value={valid} label="Valid Documents" tone="success" />
+      <CompactStatCard value={valid} label="Valid" tone="success" />
       <CompactStatCard value={expiringSoon} label="Expiring Soon" tone="warning" />
       <CompactStatCard value={expired} label="Expired" tone="danger" />
     </View>

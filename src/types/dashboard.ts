@@ -1,6 +1,7 @@
 export type DocumentCountBreakdown = {
   staff: number;
   licenses: number;
+  vehicles: number;
 };
 
 export type DashboardStats = {
@@ -8,6 +9,7 @@ export type DashboardStats = {
   branchesCount: number;
   activeStaffCount: number;
   totalPay: number;
+  vehiclesCount: number;
   validDocuments: DocumentCountBreakdown;
   expiringSoon: DocumentCountBreakdown;
   expired: DocumentCountBreakdown;
@@ -16,9 +18,9 @@ export type DashboardStats = {
 };
 
 export function totalBreakdown(breakdown: DocumentCountBreakdown): number {
-  return breakdown.staff + breakdown.licenses;
+  return breakdown.staff + breakdown.licenses + breakdown.vehicles;
 }
 
 export function formatBreakdownSubtitle(breakdown: DocumentCountBreakdown): string {
-  return `Staff: ${breakdown.staff.toLocaleString()} · Licenses: ${breakdown.licenses.toLocaleString()}`;
+  return `Staff: ${breakdown.staff.toLocaleString()} · Licenses: ${breakdown.licenses.toLocaleString()} · Vehicles: ${breakdown.vehicles.toLocaleString()}`;
 }

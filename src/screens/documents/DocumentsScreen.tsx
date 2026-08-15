@@ -16,6 +16,11 @@ import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDocumentsData } from '@/src/hooks/useDocumentsData';
 import { buildDocumentListItems, filterDocumentList } from '@/src/lib/documentFilters';
+import {
+  isVehicleDaftarDocumentId,
+  vehicleIdFromDaftarDocumentId,
+} from '@/src/lib/vehicleFields';
+import { buildVehicleDaftarDocumentItems } from '@/src/lib/vehicleDocumentItems';
 import type { DocumentsStackParamList } from '@/src/navigation/DocumentsStack';
 import {
   DEFAULT_DOCUMENT_FILTERS,
@@ -30,6 +35,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
 
   const {
     documents,
+    vehicles,
     brands,
     branches,
     staffById,
@@ -56,16 +62,23 @@ export function DocumentsScreen({ navigation, route }: Props) {
     }
   }, [routeStatus]);
 
-  const allItems = useMemo(
-    () =>
-      buildDocumentListItems(documents, {
-        staffById,
-        branchById,
-        brandById,
-        thresholdDays: alertThresholdDays,
-      }),
-    [documents, staffById, branchById, brandById, alertThresholdDays],
-  );
+  const allItems = useMemo(() => {
+    const context = {
+      staffById,
+      branchById,
+      brandById,
+      thresholdDays: alertThresholdDays,
+    };
+    const documentItems = buildDocumentListItems(documents, context);
+    const vehicleItems = buildVehicleDaftarDocumentItems(vehicles, {
+      branchById,
+      brandById,
+      thresholdDays: alertThresholdDays,
+    });
+    return [...documentItems, ...vehicleItems].sort((a, b) =>
+      (a.expiryDate ?? '').localeCompare(b.expiryDate ?? ''),
+    );
+  }, [documents, vehicles, staffById, branchById, brandById, alertThresholdDays]);
 
   const filteredItems = useMemo(
     () => filterDocumentList(allItems, filters),
@@ -92,8 +105,18 @@ export function DocumentsScreen({ navigation, route }: Props) {
     setFilters((prev) => ({ ...prev, ...patch }));
   };
 
+  const openDocumentItem = (itemId: string) => {
+    if (isVehicleDaftarDocumentId(itemId)) {
+      navigation.getParent()?.navigate('VehicleDetail', {
+        vehicleId: vehicleIdFromDaftarDocumentId(itemId),
+      });
+      return;
+    }
+    navigation.navigate('DocumentDetail', { documentId: itemId });
+  };
+
   return (
-    <AppScreenLayout title="Documents" subtitle="Staff documents & branch licenses">
+    <AppScreenLayout title="Documents" subtitle="Staff documents, licenses & vehicle Daftar">
       <View style={styles.controls}>
         <DocumentsSummaryStrip
           valid={summaryCounts.valid}
@@ -107,7 +130,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
         <SearchInput
           value={filters.search}
           onChangeText={(search) => updateFilters({ search })}
-          placeholder="Search document, staff, branch…"
+          placeholder="Search document, vehicle, staff, branch…"
         />
         <DocumentFiltersBar
           filters={filters}
@@ -117,7 +140,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {loading && documents.length === 0 ? (
+      {loading && documents.length === 0 && vehicles.length === 0 ? (
         <View style={styles.listPad}>
           {Array.from({ length: 5 }).map((_, i) => (
             <ListRowSkeleton key={i} />
@@ -137,7 +160,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
-      {!error && (documents.length > 0 || !loading) ? (
+      {!error && (documents.length > 0 || vehicles.length > 0 || !loading) ? (
         <FlatList
           {...FLAT_LIST_PERF}
           data={filteredItems}
@@ -154,9 +177,7 @@ export function DocumentsScreen({ navigation, route }: Props) {
           renderItem={({ item }) => (
             <DocumentCard
               document={item}
-              onPress={() =>
-                navigation.navigate('DocumentDetail', { documentId: item.id })
-              }
+              onPress={() => openDocumentItem(item.id)}
             />
           )}
           ListHeaderComponent={

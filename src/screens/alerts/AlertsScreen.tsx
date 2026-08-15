@@ -18,7 +18,11 @@ import { EMPTY_STATES } from '@/src/constants/emptyStates';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDocumentsData } from '@/src/hooks/useDocumentsData';
-import { buildAlertListItems, filterAlertList } from '@/src/lib/alertFilters';
+import { buildAllAlertListItems, filterAlertList } from '@/src/lib/alertFilters';
+import {
+  isVehicleDaftarDocumentId,
+  vehicleIdFromDaftarDocumentId,
+} from '@/src/lib/vehicleFields';
 import { EXPIRING_GROUP_ORDER, URGENCY_GROUP_LABELS } from '@/src/lib/alertUrgency';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { AlertFilters, AlertListItem, AlertUrgencyGroup } from '@/src/types/alerts';
@@ -49,6 +53,7 @@ export function AlertsScreen({ navigation, route }: Props) {
   const companyId = profile?.company_id;
   const {
     documents,
+    vehicles,
     brands,
     branches,
     staffById,
@@ -89,13 +94,13 @@ export function AlertsScreen({ navigation, route }: Props) {
 
   const allAlerts = useMemo(
     () =>
-      buildAlertListItems(documents, {
+      buildAllAlertListItems(documents, vehicles, {
         staffById,
         branchById,
         brandById,
         thresholdDays,
       }),
-    [documents, staffById, branchById, brandById, thresholdDays],
+    [documents, vehicles, staffById, branchById, brandById, thresholdDays],
   );
 
   const filteredAlerts = useMemo(
@@ -113,8 +118,14 @@ export function AlertsScreen({ navigation, route }: Props) {
     [filteredAlerts],
   );
 
-  const openDetail = (documentId: string) => {
-    navigation.navigate('DocumentDetail', { documentId });
+  const openDetail = (alertId: string) => {
+    if (isVehicleDaftarDocumentId(alertId)) {
+      navigation.navigate('VehicleDetail', {
+        vehicleId: vehicleIdFromDaftarDocumentId(alertId),
+      });
+      return;
+    }
+    navigation.navigate('DocumentDetail', { documentId: alertId });
   };
 
   const renderExpiringGroup = (groupKey: AlertUrgencyGroup, items: AlertListItem[]) => {
@@ -138,7 +149,7 @@ export function AlertsScreen({ navigation, route }: Props) {
         <SearchInput
           value={filters.search}
           onChangeText={(search) => setFilters((p) => ({ ...p, search }))}
-          placeholder="Search document or linked name"
+          placeholder="Search document, plate number, or linked name"
         />
         <AlertFiltersBar
           filters={filters}
@@ -148,7 +159,7 @@ export function AlertsScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {loading && documents.length === 0 ? (
+      {loading && documents.length === 0 && vehicles.length === 0 ? (
         <View style={styles.listPad}>
           {Array.from({ length: 5 }, (_, i) => (
             <ListRowSkeleton key={`alert-skeleton-${i}`} />
@@ -168,7 +179,7 @@ export function AlertsScreen({ navigation, route }: Props) {
         </View>
       ) : null}
 
-      {!error && (documents.length > 0 || !loading) ? (
+      {!error && (documents.length > 0 || vehicles.length > 0 || !loading) ? (
         <ScrollView
           contentContainerStyle={styles.listPad}
           refreshControl={
@@ -185,9 +196,28 @@ export function AlertsScreen({ navigation, route }: Props) {
             </Text>
           ) : null}
 
+          {expiredAlerts.length > 0 ? (
+            <View key="alerts-section-expired" style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleDanger]}>Expired</Text>
+                <Text style={styles.sectionCount}>{expiredAlerts.length}</Text>
+              </View>
+              {expiredAlerts.map((alert) => (
+                <AlertCard
+                  key={`expired-${alert.id}`}
+                  alert={alert}
+                  onPress={() => openDetail(alert.id)}
+                />
+              ))}
+            </View>
+          ) : null}
+
           {expiringAlerts.length > 0 ? (
             <View key="alerts-section-expiring" style={styles.section}>
-              <Text style={styles.sectionTitle}>Expiring Soon</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, styles.sectionTitleWarning]}>Expiring Soon</Text>
+                <Text style={styles.sectionCount}>{expiringAlerts.length}</Text>
+              </View>
               {EXPIRING_GROUP_ORDER.filter((groupKey) =>
                 expiringAlerts.some((alert) => alert.urgencyGroup === groupKey),
               ).map((groupKey) =>
@@ -196,19 +226,6 @@ export function AlertsScreen({ navigation, route }: Props) {
                   expiringAlerts.filter((alert) => alert.urgencyGroup === groupKey),
                 ),
               )}
-            </View>
-          ) : null}
-
-          {expiredAlerts.length > 0 ? (
-            <View key="alerts-section-expired" style={styles.section}>
-              <Text style={styles.sectionTitle}>Expired</Text>
-              {expiredAlerts.map((alert) => (
-                <AlertCard
-                  key={`expired-${alert.id}`}
-                  alert={alert}
-                  onPress={() => openDetail(alert.id)}
-                />
-              ))}
             </View>
           ) : null}
         </ScrollView>
@@ -240,11 +257,32 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: spacing.lg,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.text,
-    marginBottom: spacing.md,
+  },
+  sectionTitleDanger: {
+    color: colors.danger,
+  },
+  sectionTitleWarning: {
+    color: colors.warning,
+  },
+  sectionCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textMuted,
+    backgroundColor: colors.surface,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    overflow: 'hidden',
   },
   group: {
     marginBottom: spacing.md,

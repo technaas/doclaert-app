@@ -1,6 +1,6 @@
-export type DocumentKind = 'staff' | 'branch';
+export type DocumentKind = 'staff' | 'branch' | 'vehicle';
 
-export type DocumentTab = 'all' | 'staff' | 'branch';
+export type DocumentTab = 'all' | 'staff' | 'branch' | 'vehicle';
 
 export type DocumentDisplayStatus = 'active' | 'expiring' | 'expired';
 
@@ -30,6 +30,9 @@ export type DocumentListItem = {
   expiryDate: string | null;
   daysRemaining: number | null;
   displayStatus: DocumentDisplayStatus;
+  plateNumber?: string | null;
+  vehicleMake?: string | null;
+  vehicleModel?: string | null;
 };
 
 export type DocumentFilters = {
