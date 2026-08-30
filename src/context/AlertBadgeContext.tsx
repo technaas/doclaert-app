@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import { useAuth } from '@/src/context/AuthContext';
+import { canViewAlerts } from '@/src/lib/permissions';
 import { useCompanyDocumentsQuery } from '@/src/hooks/queries/useCompanyDocumentsQuery';
 import { countDocumentAlerts } from '@/src/lib/alertFilters';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
@@ -20,17 +21,13 @@ const AlertBadgeContext = createContext<AlertBadgeContextValue | undefined>(unde
 
 export function AlertBadgeProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
-  const companyId = profile?.company_id;
-  const query = useCompanyDocumentsQuery(companyId);
+  const companyId = canViewAlerts(profile?.role) ? profile?.company_id : undefined;
+  const query = useCompanyDocumentsQuery(companyId ?? undefined);
   const { isInitialLoading } = getQueryScreenState(query);
 
   const count = useMemo(() => {
     if (!query.data) return 0;
-    return countDocumentAlerts(
-      query.data.documents,
-      query.data.alertThresholdDays,
-      query.data.vehicles,
-    );
+    return countDocumentAlerts(query.data.documents, query.data.vehicles);
   }, [query.data]);
 
   const value = useMemo(

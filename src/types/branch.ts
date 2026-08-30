@@ -1,8 +1,12 @@
+import type { DocumentDisplayStatus } from './documents';
+
 export type BranchRecord = {
   id: string;
   company_id: string;
   brand_id: string;
   name: string;
+  governorate: string | null;
+  area: string | null;
   location: string | null;
   full_address: string | null;
   manager_name: string | null;
@@ -30,6 +34,7 @@ export type BranchDetailData = BranchRecord & {
     document_name: string;
     documentLabel: string;
     expiry_date: string | null;
-    displayStatus: 'active' | 'expiring' | 'expired';
+    file_url: string | null;
+    displayStatus: DocumentDisplayStatus;
   }>;
 };

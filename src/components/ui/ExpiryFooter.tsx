@@ -8,7 +8,7 @@ type ExpiryFooterProps = {
   expiryDate: string | null;
   daysRemaining: number | null;
   statusLabel: string;
-  statusTone: 'success' | 'warning' | 'danger' | 'muted' | 'default' | 'critical';
+  statusTone: 'success' | 'warning' | 'danger' | 'muted' | 'default' | 'critical' | 'neutral';
   expiryLabel?: string;
 };
 

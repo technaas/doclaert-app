@@ -1,5 +1,12 @@
-import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import { supabase } from '@/src/lib/supabase';
+import {
+  DOCUMENT_DETAIL_COLUMNS,
+  DOCUMENT_LIST_COLUMNS,
+  DOCUMENT_LIST_COLUMNS_LEGACY,
+  isMissingColumnError,
+  queryCompanyDocuments,
+  withExpiryStatusFallback,
+} from '@/src/services/documentSelect';
 import { fetchCompanyVehicles } from '@/src/services/vehicles';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
@@ -7,11 +14,6 @@ import type { VehicleRecord } from '@/src/types/vehicles';
 import { fetchCompanyStaffData } from '@/src/services/staff';
 
 const DEFAULT_ALERT_THRESHOLD_DAYS = 30;
-
-const DOCUMENT_COLUMNS =
-  'id,type,staff_id,branch_id,document_name,expiry_date,file_url,status';
-
-const DOCUMENT_DETAIL_COLUMNS = `${DOCUMENT_COLUMNS},notes`;
 
 function normalizeFileUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -27,6 +29,7 @@ function mapDocumentRecord(row: Record<string, unknown>): DocumentRecord {
     branch_id: (row.branch_id as string | null) ?? null,
     document_name: String(row.document_name ?? ''),
     expiry_date: (row.expiry_date as string | null) ?? null,
+    expiry_status: (row.expiry_status as string | null) ?? null,
     file_url: normalizeFileUrl(row.file_url),
     status: (row.status as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
@@ -39,9 +42,9 @@ export type CompanyDocumentsData = {
   brands: Brand[];
   branches: Branch[];
   staff: StaffMember[];
-  alertThresholdDays: number;
 };
 
+/** Reminder-notification threshold only. Do not use for UI/document status. */
 export async function fetchAlertThresholdDays(companyId: string): Promise<number> {
   const { data, error } = await supabase
     .from('email_notification_settings')
@@ -62,11 +65,10 @@ export async function fetchAlertThresholdDays(companyId: string): Promise<number
 export async function fetchCompanyDocumentsData(
   companyId: string,
 ): Promise<CompanyDocumentsData> {
-  const [lookups, documentsResult, vehicles, alertThresholdDays] = await Promise.all([
+  const [lookups, documentsResult, vehicles] = await Promise.all([
     fetchCompanyStaffData(companyId),
-    supabase.from('documents').select(DOCUMENT_COLUMNS).eq('company_id', companyId),
+    queryCompanyDocuments(companyId),
     fetchCompanyVehicles(companyId),
-    fetchAlertThresholdDays(companyId),
   ]);
 
   if (documentsResult.error) {
@@ -83,29 +85,46 @@ export async function fetchCompanyDocumentsData(
     brands: lookups.brands,
     branches: lookups.branches,
     staff: lookups.staff,
-    alertThresholdDays,
   };
 }
 
 async function fetchDocumentRow(companyId: string, documentId: string) {
-  const withNotes = await supabase
-    .from('documents')
-    .select(DOCUMENT_DETAIL_COLUMNS)
-    .eq('company_id', companyId)
-    .eq('id', documentId)
-    .maybeSingle();
+  const withNotes = await withExpiryStatusFallback(
+    supabase
+      .from('documents')
+      .select(DOCUMENT_DETAIL_COLUMNS)
+      .eq('company_id', companyId)
+      .eq('id', documentId)
+      .maybeSingle(),
+    () =>
+      supabase
+        .from('documents')
+        .select(`${DOCUMENT_LIST_COLUMNS_LEGACY},notes`)
+        .eq('company_id', companyId)
+        .eq('id', documentId)
+        .maybeSingle(),
+  );
 
   if (!withNotes.error) {
     return withNotes;
   }
 
-  if (withNotes.error.message.includes('notes')) {
-    return supabase
-      .from('documents')
-      .select(DOCUMENT_COLUMNS)
-      .eq('company_id', companyId)
-      .eq('id', documentId)
-      .maybeSingle();
+  if (isMissingColumnError(withNotes.error.message, 'notes')) {
+    return withExpiryStatusFallback(
+      supabase
+        .from('documents')
+        .select(DOCUMENT_LIST_COLUMNS)
+        .eq('company_id', companyId)
+        .eq('id', documentId)
+        .maybeSingle(),
+      () =>
+        supabase
+          .from('documents')
+          .select(DOCUMENT_LIST_COLUMNS_LEGACY)
+          .eq('company_id', companyId)
+          .eq('id', documentId)
+          .maybeSingle(),
+    );
   }
 
   return withNotes;
@@ -121,8 +140,4 @@ export async function fetchDocumentById(
   if (!data) return null;
 
   return mapDocumentRecord(data as Record<string, unknown>);
-}
-
-export function getDocumentFileUrl(document: DocumentRecord | null | undefined): string | null {
-  return resolveDocumentFileUrl(document?.file_url);
 }

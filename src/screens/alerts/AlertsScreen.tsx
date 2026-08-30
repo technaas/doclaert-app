@@ -23,6 +23,7 @@ import {
   isVehicleDaftarDocumentId,
   vehicleIdFromDaftarDocumentId,
 } from '@/src/lib/vehicleFields';
+import { isSummaryExpiring } from '@/src/lib/documentStatus';
 import { EXPIRING_GROUP_ORDER, URGENCY_GROUP_LABELS } from '@/src/lib/alertUrgency';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { AlertFilters, AlertListItem, AlertUrgencyGroup } from '@/src/types/alerts';
@@ -59,7 +60,6 @@ export function AlertsScreen({ navigation, route }: Props) {
     staffById,
     branchById,
     brandById,
-    alertThresholdDays: thresholdDays,
     loading,
     refreshing,
     error,
@@ -98,9 +98,8 @@ export function AlertsScreen({ navigation, route }: Props) {
         staffById,
         branchById,
         brandById,
-        thresholdDays,
       }),
-    [documents, vehicles, staffById, branchById, brandById, thresholdDays],
+    [documents, vehicles, staffById, branchById, brandById],
   );
 
   const filteredAlerts = useMemo(
@@ -109,7 +108,7 @@ export function AlertsScreen({ navigation, route }: Props) {
   );
 
   const expiringAlerts = useMemo(
-    () => filteredAlerts.filter((a) => a.displayStatus === 'expiring'),
+    () => filteredAlerts.filter((a) => isSummaryExpiring(a.displayStatus)),
     [filteredAlerts],
   );
 

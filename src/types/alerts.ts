@@ -29,7 +29,7 @@ export type AlertFilters = {
   tab: 'all' | 'staff' | 'branch' | 'vehicle';
   brandId: string;
   branchId: string;
-  status: 'all' | 'expiring' | 'expired';
+  status: 'all' | 'expiring' | 'critical' | 'expired';
 };
 
 export const DEFAULT_ALERT_FILTERS: AlertFilters = {

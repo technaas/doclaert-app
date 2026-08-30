@@ -1,6 +1,5 @@
-import { getDocumentDisplayStatus } from '@/src/lib/documentStatus';
 import { supabase } from '@/src/lib/supabase';
-import { fetchAlertThresholdDays } from '@/src/services/documents';
+import { queryCompanyDocuments } from '@/src/services/documentSelect';
 import type { BrandRecord } from '@/src/types/brand';
 import type { BranchRecord } from '@/src/types/branch';
 import type { DocumentRecord } from '@/src/types/documents';
@@ -11,34 +10,28 @@ export type CompanyOrgData = {
   branches: BranchRecord[];
   staff: StaffMember[];
   documents: DocumentRecord[];
-  alertThresholdDays: number;
 };
 
 export async function fetchCompanyOrgData(companyId: string): Promise<CompanyOrgData> {
-  const [brandsResult, branchesResult, staffResult, documentsResult, alertThresholdDays] =
-    await Promise.all([
-      supabase
-        .from('brands')
-        .select('id,company_id,name,contact_number,status')
-        .eq('company_id', companyId)
-        .order('name'),
-      supabase
-        .from('branches')
-        .select(
-          'id,company_id,brand_id,name,location,full_address,manager_name,manager_contact,status',
-        )
-        .eq('company_id', companyId)
-        .order('name'),
-      supabase
-        .from('staff')
-        .select('id,company_id,brand_id,branch_id,name,role,status')
-        .eq('company_id', companyId),
-      supabase
-        .from('documents')
-        .select('id,type,staff_id,branch_id,document_name,expiry_date,file_url,status')
-        .eq('company_id', companyId),
-      fetchAlertThresholdDays(companyId),
-    ]);
+  const [brandsResult, branchesResult, staffResult, documentsResult] = await Promise.all([
+    supabase
+      .from('brands')
+      .select('id,company_id,name,contact_number,status')
+      .eq('company_id', companyId)
+      .order('name'),
+    supabase
+      .from('branches')
+      .select(
+        'id,company_id,brand_id,name,governorate,area,location,full_address,manager_name,manager_contact,status',
+      )
+      .eq('company_id', companyId)
+      .order('name'),
+    supabase
+      .from('staff')
+      .select('id,company_id,brand_id,branch_id,name,role,status')
+      .eq('company_id', companyId),
+    queryCompanyDocuments(companyId),
+  ]);
 
   if (brandsResult.error) throw new Error(brandsResult.error.message);
   if (branchesResult.error) throw new Error(branchesResult.error.message);
@@ -49,18 +42,21 @@ export async function fetchCompanyOrgData(companyId: string): Promise<CompanyOrg
     brands: (brandsResult.data ?? []) as BrandRecord[],
     branches: (branchesResult.data ?? []) as BranchRecord[],
     staff: (staffResult.data ?? []) as StaffMember[],
-    documents: (documentsResult.data ?? []).map((row) => ({
-      id: String((row as { id: string }).id),
-      type: (row as { type: 'staff' | 'branch' }).type,
-      staff_id: (row as { staff_id: string | null }).staff_id ?? null,
-      branch_id: (row as { branch_id: string | null }).branch_id ?? null,
-      document_name: String((row as { document_name: string }).document_name ?? ''),
-      expiry_date: (row as { expiry_date: string | null }).expiry_date ?? null,
-      file_url: (row as { file_url: string | null }).file_url ?? null,
-      status: (row as { status: string | null }).status ?? null,
-      notes: null,
-    })),
-    alertThresholdDays,
+    documents: (documentsResult.data ?? []).map((row) => {
+      const record = row as Record<string, unknown>;
+      return {
+        id: String(record.id),
+        type: record.type as DocumentRecord['type'],
+        staff_id: (record.staff_id as string | null) ?? null,
+        branch_id: (record.branch_id as string | null) ?? null,
+        document_name: String(record.document_name ?? ''),
+        expiry_date: (record.expiry_date as string | null) ?? null,
+        expiry_status: (record.expiry_status as string | null) ?? null,
+        file_url: (record.file_url as string | null) ?? null,
+        status: (record.status as string | null) ?? null,
+        notes: null,
+      };
+    }),
   };
 }
 
@@ -69,12 +65,4 @@ export function resolveBrandIdForStaff(
   branchToBrandId: Map<string, string>,
 ): string {
   return branchToBrandId.get(staff.branch_id) ?? staff.brand_id ?? '';
-}
-
-export function countDocStatus(
-  expiry: string | null,
-  thresholdDays: number,
-): 'active' | 'expiring' | 'expired' | null {
-  if (!expiry) return null;
-  return getDocumentDisplayStatus(expiry, thresholdDays);
 }

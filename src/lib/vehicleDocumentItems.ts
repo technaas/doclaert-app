@@ -1,6 +1,11 @@
-import { getDocumentDisplayStatus } from '@/src/lib/documentStatus';
 import { getUrgencyGroup } from '@/src/lib/alertUrgency';
-import { daysUntilExpiry } from '@/src/lib/expiry';
+import {
+  daysRemainingForVehicleDaftar,
+  isAlertStatus,
+  isSummaryExpiring,
+  isSummaryValid,
+  uiStatusForVehicleDaftar,
+} from '@/src/lib/documentStatus';
 import {
   formatPlateNumber,
   formatVehicleTitle,
@@ -16,7 +21,6 @@ import type { Branch, Brand } from '@/src/types/staff';
 type LookupContext = {
   branchById: Map<string, Branch>;
   brandById: Map<string, Brand>;
-  thresholdDays: number;
 };
 
 function vehicleLinkedLabel(vehicle: VehicleRecord): string {
@@ -28,6 +32,21 @@ function vehicleLinkedLabel(vehicle: VehicleRecord): string {
   return `${title} · ${formatPlateNumber(vehicle.plate_number)}`;
 }
 
+function vehicleOrg(vehicle: VehicleRecord, context: LookupContext) {
+  const branch = context.branchById.get(vehicle.branch_id);
+  const brand = branch
+    ? context.brandById.get(branch.brand_id)
+    : context.brandById.get(vehicle.brand_id);
+  return {
+    branch,
+    brand,
+    brandId: brand?.id ?? vehicle.brand_id,
+    brandName: brand?.name ?? '—',
+    branchId: branch?.id ?? vehicle.branch_id,
+    branchName: branch?.name ?? '—',
+  };
+}
+
 export function buildVehicleDaftarDocumentItems(
   vehicles: VehicleRecord[],
   context: LookupContext,
@@ -35,17 +54,8 @@ export function buildVehicleDaftarDocumentItems(
   const items: DocumentListItem[] = [];
 
   for (const vehicle of vehicles) {
-    if (!vehicle.daftar_expiry_date) continue;
-
-    const branch = context.branchById.get(vehicle.branch_id);
-    const brand = branch
-      ? context.brandById.get(branch.brand_id)
-      : context.brandById.get(vehicle.brand_id);
-
-    const displayStatus = getDocumentDisplayStatus(
-      vehicle.daftar_expiry_date,
-      context.thresholdDays,
-    );
+    const org = vehicleOrg(vehicle, context);
+    const displayStatus = uiStatusForVehicleDaftar(vehicle.daftar_expiry_date);
 
     items.push({
       id: vehicleDaftarDocumentId(vehicle.id),
@@ -54,12 +64,12 @@ export function buildVehicleDaftarDocumentItems(
       documentLabel: VEHICLE_DAFTAR_LABEL,
       linkedTo: vehicleLinkedLabel(vehicle),
       ownerId: vehicle.id,
-      brandId: brand?.id ?? vehicle.brand_id,
-      brandName: brand?.name ?? '—',
-      branchId: branch?.id ?? vehicle.branch_id,
-      branchName: branch?.name ?? '—',
+      brandId: org.brandId,
+      brandName: org.brandName,
+      branchId: org.branchId,
+      branchName: org.branchName,
       expiryDate: vehicle.daftar_expiry_date,
-      daysRemaining: daysUntilExpiry(vehicle.daftar_expiry_date),
+      daysRemaining: daysRemainingForVehicleDaftar(vehicle.daftar_expiry_date),
       displayStatus,
       plateNumber: safeText(vehicle.plate_number) || null,
       vehicleMake: safeText(vehicle.vehicle_make) || null,
@@ -79,20 +89,14 @@ export function buildVehicleDaftarAlertItems(
   for (const vehicle of vehicles) {
     if (!vehicle.daftar_expiry_date) continue;
 
-    const displayStatus = getDocumentDisplayStatus(
-      vehicle.daftar_expiry_date,
-      context.thresholdDays,
-    );
-    if (displayStatus !== 'expired' && displayStatus !== 'expiring') continue;
+    const displayStatus = uiStatusForVehicleDaftar(vehicle.daftar_expiry_date);
+    if (!isAlertStatus(displayStatus)) continue;
 
-    const daysRemaining = daysUntilExpiry(vehicle.daftar_expiry_date);
+    const daysRemaining = daysRemainingForVehicleDaftar(vehicle.daftar_expiry_date);
     const urgencyGroup = getUrgencyGroup(daysRemaining, displayStatus);
     if (!urgencyGroup) continue;
 
-    const branch = context.branchById.get(vehicle.branch_id);
-    const brand = branch
-      ? context.brandById.get(branch.brand_id)
-      : context.brandById.get(vehicle.brand_id);
+    const org = vehicleOrg(vehicle, context);
 
     items.push({
       id: vehicleDaftarDocumentId(vehicle.id),
@@ -102,10 +106,10 @@ export function buildVehicleDaftarAlertItems(
         ? `Plate No: ${safeText(vehicle.plate_number)}`
         : formatPlateNumber(vehicle.plate_number),
       linkedTo: vehicleLinkedLabel(vehicle),
-      brandId: brand?.id ?? vehicle.brand_id,
-      brandName: brand?.name ?? '—',
-      branchId: branch?.id ?? vehicle.branch_id,
-      branchName: branch?.name ?? '—',
+      brandId: org.brandId,
+      brandName: org.brandName,
+      branchId: org.branchId,
+      branchName: org.branchName,
       expiryDate: vehicle.daftar_expiry_date,
       daysRemaining,
       displayStatus,
@@ -117,15 +121,29 @@ export function buildVehicleDaftarAlertItems(
   return items;
 }
 
-export function countVehicleDaftarAlerts(
-  vehicles: VehicleRecord[],
-  thresholdDays: number,
-): number {
+export function countVehicleDaftarAlerts(vehicles: VehicleRecord[]): number {
   let count = 0;
   for (const vehicle of vehicles) {
     if (!vehicle.daftar_expiry_date) continue;
-    const status = getDocumentDisplayStatus(vehicle.daftar_expiry_date, thresholdDays);
-    if (status === 'expired' || status === 'expiring') count += 1;
+    if (isAlertStatus(uiStatusForVehicleDaftar(vehicle.daftar_expiry_date))) count += 1;
   }
   return count;
+}
+
+export function countVehicleDaftarSummary(vehicles: VehicleRecord[]): {
+  valid: number;
+  expiringSoon: number;
+  expired: number;
+} {
+  let valid = 0;
+  let expiringSoon = 0;
+  let expired = 0;
+  for (const vehicle of vehicles) {
+    if (!vehicle.daftar_expiry_date) continue;
+    const status = uiStatusForVehicleDaftar(vehicle.daftar_expiry_date);
+    if (status === 'expired') expired += 1;
+    else if (isSummaryExpiring(status)) expiringSoon += 1;
+    else if (isSummaryValid(status)) valid += 1;
+  }
+  return { valid, expiringSoon, expired };
 }

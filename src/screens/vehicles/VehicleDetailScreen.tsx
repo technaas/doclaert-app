@@ -1,15 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DocumentImagePreviewModal } from '@/src/components/documents/DocumentImagePreviewModal';
+import { DocumentFileActions } from '@/src/components/documents/DocumentFileActions';
 import { DetailRow } from '@/src/components/ui/DetailRow';
 import { ErrorState } from '@/src/components/ui/ErrorState';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
@@ -18,19 +10,17 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useVehicleDetailData } from '@/src/hooks/useVehicleDetailData';
 import {
   DOCUMENT_STATUS_LABEL,
+  daysRemainingForVehicleDaftar,
   formatDaysRemaining,
-  getDocumentDisplayStatus,
   statusBadgeTone,
+  uiStatusForVehicleDaftar,
 } from '@/src/lib/documentStatus';
-import { daysUntilExpiry } from '@/src/lib/expiry';
-import { openDocumentFile, openUrlInBrowser } from '@/src/lib/openDocumentFile';
 import {
   formatPlateNumber,
   formatVehicleTitle,
   safeText,
   VEHICLE_DAFTAR_LABEL,
 } from '@/src/lib/vehicleFields';
-import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import type { VehiclesStackParamList } from '@/src/navigation/VehiclesStack';
 
 type Props = NativeStackScreenProps<VehiclesStackParamList, 'VehicleDetail'>;
@@ -45,64 +35,11 @@ export function VehicleDetailScreen({ route }: Props) {
     brandName,
     branchName,
     daftarFileUrl,
-    thresholdDays,
+    driverCivilIdFileUrl,
     loading,
     error,
     retry,
   } = useVehicleDetailData(companyId, vehicleId);
-
-  const [openingFile, setOpeningFile] = useState(false);
-  const [fileOpenError, setFileOpenError] = useState<string | null>(null);
-  const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-
-  const handleOpenInBrowser = async () => {
-    const url = resolveDocumentFileUrl(daftarFileUrl);
-    if (!url) {
-      setFileOpenError('Invalid document URL.');
-      return;
-    }
-
-    setFileOpenError(null);
-    setOpeningFile(true);
-
-    try {
-      await openUrlInBrowser(url);
-    } catch (err) {
-      setFileOpenError(err instanceof Error ? err.message : 'Failed to open in browser.');
-    } finally {
-      setOpeningFile(false);
-    }
-  };
-
-  const handleViewDaftar = async () => {
-    const url = resolveDocumentFileUrl(daftarFileUrl);
-    if (!url) {
-      setFileOpenError('Invalid document URL.');
-      return;
-    }
-
-    setFileOpenError(null);
-    setOpeningFile(true);
-
-    try {
-      const result = await openDocumentFile(url);
-
-      if (result.action === 'image-preview') {
-        setImagePreviewUrl(result.url);
-        setImagePreviewVisible(true);
-        return;
-      }
-
-      if (result.action === 'failed') {
-        setFileOpenError(result.message);
-      }
-    } catch (err) {
-      setFileOpenError(err instanceof Error ? err.message : 'Failed to open document.');
-    } finally {
-      setOpeningFile(false);
-    }
-  };
 
   if (loading && !vehicle) {
     return (
@@ -120,8 +57,8 @@ export function VehicleDetailScreen({ route }: Props) {
     );
   }
 
-  const daftarStatus = getDocumentDisplayStatus(vehicle.daftar_expiry_date, thresholdDays);
-  const days = vehicle.daftar_expiry_date ? daysUntilExpiry(vehicle.daftar_expiry_date) : null;
+  const daftarStatus = uiStatusForVehicleDaftar(vehicle.daftar_expiry_date);
+  const days = daysRemainingForVehicleDaftar(vehicle.daftar_expiry_date);
   const statusLabel = safeText(vehicle.status) || '—';
   const recordTone =
     statusLabel.toLowerCase() === 'active'
@@ -129,98 +66,70 @@ export function VehicleDetailScreen({ route }: Props) {
       : statusLabel.toLowerCase() === 'inactive'
         ? 'muted'
         : 'default';
+  const vehicleTitle = formatVehicleTitle(vehicle);
 
   return (
-    <>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vehicle</Text>
-          <DetailRow label="Vehicle Make" value={safeText(vehicle.vehicle_make) || '—'} />
-          <DetailRow label="Model" value={safeText(vehicle.model) || '—'} />
-          <DetailRow label="Plate Number" value={formatPlateNumber(vehicle.plate_number)} />
-          <DetailRow label="Chassis Number (VIN)" value={safeText(vehicle.chassis_number) || '—'} />
-          <DetailRow label="Engine Number" value={safeText(vehicle.engine_number) || '—'} />
-          <DetailRow label="Vehicle Color" value={safeText(vehicle.vehicle_color) || '—'} />
-          <DetailRow
-            label="Year of Manufacture"
-            value={vehicle.year_of_manufacture?.toString() ?? '—'}
+    <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Vehicle</Text>
+        <DetailRow label="Company name" value={safeText(vehicle.company_name) || '—'} />
+        <DetailRow label="Vehicle number" value={safeText(vehicle.number) || '—'} />
+        <DetailRow label="Vehicle make" value={safeText(vehicle.vehicle_make) || '—'} />
+        <DetailRow label="Model" value={safeText(vehicle.model) || '—'} />
+        <DetailRow label="Registration / plate" value={formatPlateNumber(vehicle.plate_number)} />
+        <DetailRow label="Year" value={vehicle.year_of_manufacture?.toString() ?? '—'} />
+        <DetailRow label="Color" value={safeText(vehicle.vehicle_color) || '—'} />
+        <DetailRow label="Chassis number (VIN)" value={safeText(vehicle.chassis_number) || '—'} />
+        <DetailRow label="Engine number" value={safeText(vehicle.engine_number) || '—'} />
+        <DetailRow label="Status">
+          <StatusBadge label={statusLabel} tone={recordTone} />
+        </DetailRow>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Vehicle Daftar</Text>
+        <DetailRow label="Daftar number" value={safeText(vehicle.daftar_number) || '—'} />
+        <DetailRow label="Daftar expiry" value={vehicle.daftar_expiry_date ?? '—'} />
+        <DetailRow label="Days remaining" value={formatDaysRemaining(days)} />
+        <DetailRow label="Daftar status">
+          <StatusBadge
+            label={DOCUMENT_STATUS_LABEL[daftarStatus]}
+            tone={statusBadgeTone(daftarStatus)}
           />
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Status</Text>
-            <StatusBadge label={statusLabel} tone={recordTone} />
-          </View>
-        </View>
+        </DetailRow>
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vehicle Daftar</Text>
-          <DetailRow label="Daftar Number" value={safeText(vehicle.daftar_number) || '—'} />
-          <DetailRow label="Daftar Expiry" value={vehicle.daftar_expiry_date ?? '—'} />
-          <DetailRow label="Days remaining" value={formatDaysRemaining(days)} />
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Daftar status</Text>
-            <StatusBadge
-              label={DOCUMENT_STATUS_LABEL[daftarStatus]}
-              tone={statusBadgeTone(daftarStatus)}
-            />
-          </View>
-        </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Organization</Text>
+        <DetailRow label="Brand" value={brandName} />
+        <DetailRow label="Branch" value={branchName} />
+      </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Organization</Text>
-          <DetailRow label="Brand" value={brandName} />
-          <DetailRow label="Branch" value={branchName} />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Daftar file</Text>
-          {daftarFileUrl ? (
-            <>
-              <Pressable
-                style={[styles.fileButton, openingFile && styles.fileButtonDisabled]}
-                onPress={() => void handleViewDaftar()}
-                disabled={openingFile}>
-                {openingFile ? (
-                  <ActivityIndicator color={colors.background} size="small" />
-                ) : (
-                  <Text style={styles.fileButtonText}>View Vehicle Daftar</Text>
-                )}
-              </Pressable>
-              {fileOpenError ? (
-                <>
-                  <Text style={styles.fileError}>{fileOpenError}</Text>
-                  <Pressable
-                    style={[styles.secondaryButton, openingFile && styles.fileButtonDisabled]}
-                    onPress={() => void handleOpenInBrowser()}
-                    disabled={openingFile}>
-                    <Text style={styles.secondaryButtonText}>Open in Browser</Text>
-                  </Pressable>
-                </>
-              ) : null}
-            </>
-          ) : (
-            <Text style={styles.noFile}>No Daftar file uploaded</Text>
-          )}
-        </View>
-      </ScrollView>
-
-      {imagePreviewUrl ? (
-        <DocumentImagePreviewModal
-          visible={imagePreviewVisible}
-          uri={imagePreviewUrl}
-          title={`${formatVehicleTitle(vehicle)} · ${VEHICLE_DAFTAR_LABEL}`}
-          onClose={() => {
-            setImagePreviewVisible(false);
-            setImagePreviewUrl(null);
-          }}
-          onError={(message) => {
-            setImagePreviewVisible(false);
-            setImagePreviewUrl(null);
-            setFileOpenError(message);
-          }}
-          onOpenInBrowser={() => void handleOpenInBrowser()}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Daftar file</Text>
+        <DocumentFileActions
+          storedFileUrl={daftarFileUrl}
+          title={`${vehicleTitle} · ${VEHICLE_DAFTAR_LABEL}`}
+          viewLabel="View Vehicle Daftar"
+          emptyLabel="No Daftar file uploaded"
         />
-      ) : null}
-    </>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Driver Civil ID</Text>
+        <DetailRow label="Driver name" value={safeText(vehicle.driver_name) || '—'} />
+        <DetailRow
+          label="Civil ID number"
+          value={safeText(vehicle.driver_civil_id_number) || '—'}
+        />
+        <DocumentFileActions
+          storedFileUrl={driverCivilIdFileUrl}
+          title={`${vehicleTitle} · Driver Civil ID`}
+          viewLabel="View Driver Civil ID"
+          emptyLabel="No Civil ID file uploaded"
+        />
+      </View>
+    </ScrollView>
   );
 }
 
@@ -267,44 +176,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  fileButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  fileButtonDisabled: {
-    opacity: 0.7,
-  },
-  fileButtonText: {
-    color: colors.background,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  noFile: {
-    fontSize: 14,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
-  fileError: {
-    fontSize: 13,
-    color: colors.danger,
-    marginBottom: spacing.sm,
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    backgroundColor: colors.background,
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
   },
 });

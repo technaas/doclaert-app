@@ -1,5 +1,9 @@
 import { getDocumentLabel } from '@/src/constants/documents';
-import { countDocStatus } from '@/src/services/orgData';
+import {
+  isSummaryExpiring,
+  uiStatusForDocument,
+} from '@/src/lib/documentStatus';
+import { isDocumentInventoryRow } from '@/src/lib/operationalExpiry';
 import type { BranchListItem, BranchRecord } from '@/src/types/branch';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { StaffMember } from '@/src/types/staff';
@@ -7,13 +11,11 @@ import type { StaffMember } from '@/src/types/staff';
 type OrgContext = {
   staff: StaffMember[];
   documents: DocumentRecord[];
-  thresholdDays: number;
 };
 
 function countBranchLicenses(
   branchId: string,
   documents: DocumentRecord[],
-  thresholdDays: number,
 ): { total: number; expiring: number; expired: number } {
   let total = 0;
   let expiring = 0;
@@ -21,12 +23,11 @@ function countBranchLicenses(
 
   for (const doc of documents) {
     if (doc.type !== 'branch' || doc.branch_id !== branchId) continue;
+    if (!isDocumentInventoryRow(doc)) continue;
     total += 1;
-    if (!doc.expiry_date) continue;
-
-    const status = countDocStatus(doc.expiry_date, thresholdDays);
+    const status = uiStatusForDocument(doc);
     if (status === 'expired') expired += 1;
-    else if (status === 'expiring') expiring += 1;
+    else if (isSummaryExpiring(status)) expiring += 1;
   }
 
   return { total, expiring, expired };
@@ -44,11 +45,7 @@ export function buildBranchListItems(
   });
 
   return branches.map((branch) => {
-    const licenseCounts = countBranchLicenses(
-      branch.id,
-      context.documents,
-      context.thresholdDays,
-    );
+    const licenseCounts = countBranchLicenses(branch.id, context.documents);
 
     return {
       ...branch,
@@ -75,28 +72,26 @@ export function filterBranches(
     return (
       branch.name.toLowerCase().includes(query) ||
       (branch.location ?? '').toLowerCase().includes(query) ||
+      (branch.governorate ?? '').toLowerCase().includes(query) ||
+      (branch.area ?? '').toLowerCase().includes(query) ||
+      (branch.full_address ?? '').toLowerCase().includes(query) ||
       branch.brandName.toLowerCase().includes(query)
     );
   });
 }
 
-export function getBranchDetailLicenses(
-  branchId: string,
-  documents: DocumentRecord[],
-  thresholdDays: number,
-) {
+export function getBranchDetailLicenses(branchId: string, documents: DocumentRecord[]) {
   return documents
     .filter((doc) => doc.type === 'branch' && doc.branch_id === branchId)
     .map((doc) => {
-      const displayStatus = doc.expiry_date
-        ? countDocStatus(doc.expiry_date, thresholdDays) ?? 'active'
-        : 'active';
+      const displayStatus = uiStatusForDocument(doc);
       return {
         id: doc.id,
         document_name: doc.document_name,
         documentLabel: getDocumentLabel(doc.document_name),
         expiry_date: doc.expiry_date,
-        displayStatus: displayStatus as 'active' | 'expiring' | 'expired',
+        file_url: doc.file_url,
+        displayStatus,
       };
     })
     .sort((a, b) => (a.expiry_date ?? '').localeCompare(b.expiry_date ?? ''));

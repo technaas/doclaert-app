@@ -5,6 +5,7 @@ import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import {
   DOCUMENT_STATUS_LABEL,
+  listCardTone,
   statusBadgeTone,
 } from '@/src/lib/documentStatus';
 import {
@@ -23,12 +24,7 @@ type VehicleCardProps = {
 
 function VehicleCardComponent({ vehicle, onPress }: VehicleCardProps) {
   const daftarTone = statusBadgeTone(vehicle.displayStatus);
-  const cardTone =
-    vehicle.displayStatus === 'expired'
-      ? 'danger'
-      : vehicle.displayStatus === 'expiring'
-        ? 'warning'
-        : 'default';
+  const cardTone = listCardTone(vehicle.displayStatus);
 
   const statusLabel = safeText(vehicle.status) || '—';
   const recordTone =
@@ -41,9 +37,15 @@ function VehicleCardComponent({ vehicle, onPress }: VehicleCardProps) {
   const plateDisplay = formatPlateNumber(vehicle.plateNumber);
   const daftarDisplay = formatDaftarNumber(vehicle.daftarNumber);
 
-  const subtitleParts = [`Plate Number: ${plateDisplay}`];
+  const subtitleParts = [`Plate: ${plateDisplay}`];
+  if (safeText(vehicle.fleetNumber)) {
+    subtitleParts.unshift(`No. ${safeText(vehicle.fleetNumber)}`);
+  }
+  if (safeText(vehicle.companyName)) {
+    subtitleParts.unshift(safeText(vehicle.companyName));
+  }
   if (safeText(vehicle.daftarNumber)) {
-    subtitleParts.push(`Daftar Number: ${daftarDisplay}`);
+    subtitleParts.push(`Daftar: ${daftarDisplay}`);
   }
 
   return (

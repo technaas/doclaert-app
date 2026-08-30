@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { colors } from '@/src/constants/theme';
 import { VehicleDetailScreen } from '@/src/screens/vehicles/VehicleDetailScreen';
 import { VehiclesScreen } from '@/src/screens/vehicles/VehiclesScreen';
 
@@ -28,7 +29,7 @@ export function VehiclesStack() {
         options={{
           presentation: 'modal',
           title: 'Vehicle Details',
-          headerTintColor: '#2563EB',
+          headerTintColor: colors.primary,
         }}
       />
     </Stack.Navigator>

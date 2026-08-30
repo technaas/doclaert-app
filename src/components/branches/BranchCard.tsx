@@ -5,6 +5,7 @@ import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { colors, spacing } from '@/src/constants/theme';
 import { formatCount } from '@/src/lib/format';
+import { formatBranchLocation } from '@/src/lib/kuwait-locations';
 import type { BranchListItem } from '@/src/types/branch';
 
 type BranchCardProps = {
@@ -24,7 +25,9 @@ function BranchCardComponent({ branch, onPress }: BranchCardProps) {
     <ListCard
       title={branch.name}
       subtitle={branch.brandName}
-      meta={[branch.location, branch.manager_name].filter(Boolean).join(' · ') || undefined}
+      meta={[formatBranchLocation(branch) || branch.location, branch.manager_name]
+        .filter(Boolean)
+        .join(' · ') || undefined}
       onPress={onPress}
       badges={<StatusBadge label={branch.status ?? '—'} tone={statusTone} size="sm" />}
       footer={

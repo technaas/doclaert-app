@@ -1,5 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 
+import { PermissionGate } from '@/src/components/access/PermissionGate';
 import { modalScreenOptions, stackScreenOptions } from '@/src/constants/navigation';
 import type { AlertFilters } from '@/src/types/alerts';
 import { MainTabNavigator } from '@/src/navigation/MainTabNavigator';
@@ -10,6 +12,9 @@ import { BranchDetailScreen } from '@/src/screens/branches/BranchDetailScreen';
 import { BranchesScreen } from '@/src/screens/branches/BranchesScreen';
 import { DocumentDetailScreen } from '@/src/screens/documents/DocumentDetailScreen';
 import { VehicleDetailScreen } from '@/src/screens/vehicles/VehicleDetailScreen';
+import { PermissionDenied } from '@/src/components/access/PermissionDenied';
+import type { VehiclesStackParamList } from '@/src/navigation/VehiclesStack';
+import { VehiclesStack } from '@/src/navigation/VehiclesStack';
 
 export type AppStackParamList = {
   MainTabs: undefined;
@@ -25,6 +30,8 @@ export type AppStackParamList = {
   BranchDetail: { branchId: string };
   DocumentDetail: { documentId: string };
   VehicleDetail: { vehicleId: string };
+  Vehicles: NavigatorScreenParams<VehiclesStackParamList> | undefined;
+  AccessDenied: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -37,35 +44,79 @@ export function AppStack() {
         component={MainTabNavigator}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alerts' }} />
-      <Stack.Screen name="Brands" component={BrandsScreen} options={{ title: 'Brands' }} />
-      <Stack.Screen
-        name="BrandDetail"
-        component={BrandDetailScreen}
-        options={{ title: 'Brand Details' }}
-      />
-      <Stack.Screen name="Branches" component={BranchesScreen} options={{ title: 'Branches' }} />
-      <Stack.Screen
-        name="BranchDetail"
-        component={BranchDetailScreen}
-        options={{ title: 'Branch Details' }}
-      />
+      <Stack.Screen name="Alerts" options={{ title: 'Alerts' }}>
+        {(props) => (
+          <PermissionGate route="Alerts">
+            <AlertsScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Brands" options={{ title: 'Brands' }}>
+        {(props) => (
+          <PermissionGate route="Brands">
+            <BrandsScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="BrandDetail" options={{ title: 'Brand Details' }}>
+        {(props) => (
+          <PermissionGate route="BrandDetail">
+            <BrandDetailScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Branches" options={{ title: 'Branches' }}>
+        {() => (
+          <PermissionGate route="Branches">
+            <BranchesScreen />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="BranchDetail" options={{ title: 'Branch Details' }}>
+        {(props) => (
+          <PermissionGate route="BranchDetail">
+            <BranchDetailScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name="DocumentDetail"
-        component={DocumentDetailScreen}
         options={{
           ...modalScreenOptions,
           title: 'Document Details',
-        }}
-      />
+        }}>
+        {(props) => (
+          <PermissionGate route="DocumentDetail">
+            <DocumentDetailScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name="Vehicles"
+        options={{ headerShown: false }}>
+        {() => (
+          <PermissionGate route="Vehicles">
+            <VehiclesStack />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
       <Stack.Screen
         name="VehicleDetail"
-        component={VehicleDetailScreen}
         options={{
           ...modalScreenOptions,
           title: 'Vehicle Details',
-        }}
-      />
+        }}>
+        {(props) => (
+          <PermissionGate route="VehicleDetail">
+            <VehicleDetailScreen {...props} />
+          </PermissionGate>
+        )}
+      </Stack.Screen>
+      <Stack.Screen
+        name="AccessDenied"
+        options={{ title: 'Access denied' }}>
+        {() => <PermissionDenied />}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 }

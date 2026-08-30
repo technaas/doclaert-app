@@ -1,7 +1,13 @@
+import { parseStoragePathFromFileUrl } from '@/src/lib/documentStorage';
+
 export type DocumentFileKind = 'image' | 'pdf' | 'unknown';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp']);
 const PDF_EXTENSIONS = new Set(['pdf']);
+
+export function hasUploadedDocumentFile(fileUrl: string | null | undefined): boolean {
+  return !!(fileUrl && fileUrl.trim());
+}
 
 export function resolveDocumentFileUrl(raw: string | null | undefined): string | null {
   if (typeof raw !== 'string') {
@@ -56,4 +62,32 @@ export function getDocumentFileKind(url: string): DocumentFileKind {
 export function isPreviewableDocumentUrl(url: string): boolean {
   const kind = getDocumentFileKind(url);
   return kind === 'image' || kind === 'pdf';
+}
+
+export function getStoredDocumentFileKind(
+  storedFileUrl: string | null | undefined,
+): DocumentFileKind {
+  const path = parseStoragePathFromFileUrl(storedFileUrl);
+  if (path) {
+    return getDocumentFileKind(`https://example.invalid/${path}`);
+  }
+  if (!storedFileUrl?.trim()) return 'unknown';
+  return getDocumentFileKind(storedFileUrl.trim());
+}
+
+export function mimeTypeForDocumentKind(kind: DocumentFileKind): string | undefined {
+  if (kind === 'pdf') return 'application/pdf';
+  if (kind === 'image') return 'image/jpeg';
+  return undefined;
+}
+
+export function suggestedDocumentFileName(
+  storedFileUrl: string | null | undefined,
+  fallback = 'document',
+): string {
+  const path = parseStoragePathFromFileUrl(storedFileUrl);
+  const source = path ?? storedFileUrl ?? fallback;
+  const segment = source.split('/').pop()?.split('?')[0] ?? fallback;
+  const cleaned = segment.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+  return cleaned || fallback;
 }

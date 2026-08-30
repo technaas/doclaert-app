@@ -1,5 +1,8 @@
-import { getDocumentDisplayStatus } from '@/src/lib/documentStatus';
-import { daysUntilExpiry } from '@/src/lib/expiry';
+import {
+  daysRemainingForVehicleDaftar,
+  matchesStatusFilter,
+  uiStatusForVehicleDaftar,
+} from '@/src/lib/documentStatus';
 import { formatVehicleTitle, safeText } from '@/src/lib/vehicleFields';
 import type { VehicleFilters, VehicleListItem, VehicleRecord } from '@/src/types/vehicles';
 import type { Branch, Brand } from '@/src/types/staff';
@@ -7,7 +10,6 @@ import type { Branch, Brand } from '@/src/types/staff';
 type LookupContext = {
   branchById: Map<string, Branch>;
   brandById: Map<string, Brand>;
-  thresholdDays: number;
 };
 
 export function buildVehicleListItems(
@@ -22,13 +24,10 @@ export function buildVehicleListItems(
       ? context.brandById.get(branch.brand_id)
       : context.brandById.get(vehicle.brand_id);
 
-    const displayStatus = getDocumentDisplayStatus(
-      vehicle.daftar_expiry_date,
-      context.thresholdDays,
-    );
-
     items.push({
       id: vehicle.id,
+      companyName: vehicle.company_name,
+      fleetNumber: vehicle.number,
       vehicleMake: vehicle.vehicle_make,
       model: vehicle.model,
       plateNumber: vehicle.plate_number,
@@ -38,10 +37,8 @@ export function buildVehicleListItems(
       branchId: branch?.id ?? vehicle.branch_id,
       branchName: branch?.name ?? '—',
       daftarExpiryDate: vehicle.daftar_expiry_date,
-      daysRemaining: vehicle.daftar_expiry_date
-        ? daysUntilExpiry(vehicle.daftar_expiry_date)
-        : null,
-      displayStatus,
+      daysRemaining: daysRemainingForVehicleDaftar(vehicle.daftar_expiry_date),
+      displayStatus: uiStatusForVehicleDaftar(vehicle.daftar_expiry_date),
       status: vehicle.status,
     });
   }
@@ -68,7 +65,7 @@ export function filterVehicleList(
   return items.filter((item) => {
     if (filters.brandId !== 'all' && item.brandId !== filters.brandId) return false;
     if (filters.branchId !== 'all' && item.branchId !== filters.branchId) return false;
-    if (filters.status !== 'all' && item.displayStatus !== filters.status) return false;
+    if (!matchesStatusFilter(item.displayStatus, filters.status)) return false;
 
     if (!search) return true;
 
@@ -80,6 +77,8 @@ export function filterVehicleList(
       title.includes(search) ||
       safeText(item.plateNumber).toLowerCase().includes(search) ||
       safeText(item.daftarNumber).toLowerCase().includes(search) ||
+      safeText(item.companyName).toLowerCase().includes(search) ||
+      safeText(item.fleetNumber).toLowerCase().includes(search) ||
       safeText(item.brandName).toLowerCase().includes(search) ||
       safeText(item.branchName).toLowerCase().includes(search)
     );

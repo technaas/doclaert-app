@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useCompanyDocumentsQuery } from '@/src/hooks/queries/useCompanyDocumentsQuery';
 import { queryKeys } from '@/src/lib/queryKeys';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
-import { fetchDocumentById, getDocumentFileUrl } from '@/src/services/documents';
+import { fetchDocumentById } from '@/src/services/documents';
 
 export function useDocumentDetailData(
-  companyId: string | undefined,
+  companyId: string | null | undefined,
   documentId: string,
 ) {
   const lookupsQuery = useCompanyDocumentsQuery(companyId);
@@ -20,19 +20,27 @@ export function useDocumentDetailData(
 
   const lookupsState = getQueryScreenState(lookupsQuery);
   const documentState = getQueryScreenState(documentQuery);
+  const fetched = documentQuery.data ?? null;
+  const inScope = Boolean(
+    fetched && lookupsQuery.data?.documents.some((row) => row.id === fetched.id),
+  );
+  const lookupsReady = !lookupsState.isInitialLoading && !lookupsQuery.isPending;
+  const documentReady = !documentState.isInitialLoading && !documentQuery.isPending;
 
-  const isInitialLoading =
-    (lookupsState.isInitialLoading || documentState.isInitialLoading) &&
-    !documentQuery.data;
+  const isInitialLoading = lookupsState.isInitialLoading || documentState.isInitialLoading;
 
   const errorMessage = !companyId
     ? 'Company not found.'
-    : documentQuery.data === null && !documentState.isInitialLoading && !documentQuery.isError
-      ? 'Document not found.'
-      : documentQuery.error?.message ?? lookupsQuery.error?.message ?? null;
+    : lookupsQuery.error?.message ??
+      documentQuery.error?.message ??
+      (lookupsReady && documentReady && fetched && !inScope
+        ? 'Your role does not include this record.'
+        : lookupsReady && documentReady && !fetched
+          ? 'Document not found.'
+          : null);
 
   const linkedMeta = useMemo(() => {
-    const doc = documentQuery.data;
+    const doc = inScope ? fetched : null;
     const lookups = lookupsQuery.data;
     if (!doc || !lookups) {
       return {
@@ -79,14 +87,11 @@ export function useDocumentDetailData(
       branchName: '—',
       staffInfo: null,
     };
-  }, [documentQuery.data, lookupsQuery.data]);
+  }, [fetched, inScope, lookupsQuery.data]);
 
   return {
-    document: documentQuery.data ?? null,
-    thresholdDays: lookupsQuery.data?.alertThresholdDays ?? 30,
-    documentFileUrl: documentQuery.data
-      ? getDocumentFileUrl(documentQuery.data)
-      : null,
+    document: inScope ? fetched : null,
+    documentFileUrl: inScope ? (fetched?.file_url ?? null) : null,
     ...linkedMeta,
     loading: isInitialLoading,
     error: errorMessage,

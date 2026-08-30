@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/src/constants/theme';
@@ -10,12 +10,7 @@ export function NotificationBell() {
   const { count } = useAlertBadge();
 
   const openAlerts = () => {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('Alerts' as never);
-      return;
-    }
-    navigation.navigate('Alerts' as never);
+    navigation.dispatch(CommonActions.navigate({ name: 'Alerts' }));
   };
 
   return (

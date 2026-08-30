@@ -40,6 +40,8 @@ export function mapVehicleRecord(row: Record<string, unknown>): VehicleRecord {
   return {
     id: String(row.id ?? ''),
     company_id: String(row.company_id ?? ''),
+    company_name: readNullableString(row, 'company_name'),
+    number: readNullableString(row, 'number'),
     vehicle_make: readString(row, 'vehicle_make'),
     model: readString(row, 'model'),
     plate_number: readString(row, 'plate_number', 'registration_number'),
@@ -59,6 +61,9 @@ export function mapVehicleRecord(row: Record<string, unknown>): VehicleRecord {
       'duftar_expiry_date',
     ),
     daftar_file_url: readNullableString(row, 'daftar_file_url', 'duftar_file_url'),
+    driver_name: readNullableString(row, 'driver_name'),
+    driver_civil_id_number: readNullableString(row, 'driver_civil_id_number'),
+    driver_civil_id_file_url: readNullableString(row, 'driver_civil_id_file_url'),
     brand_id: String(row.brand_id ?? ''),
     branch_id: String(row.branch_id ?? ''),
     status: readString(row, 'status') || 'active',

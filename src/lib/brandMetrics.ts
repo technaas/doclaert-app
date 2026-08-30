@@ -1,4 +1,6 @@
-import { countDocStatus, resolveBrandIdForStaff } from '@/src/services/orgData';
+import { resolveBrandIdForStaff } from '@/src/services/orgData';
+import { isSummaryExpiring, uiStatusForDocument } from '@/src/lib/documentStatus';
+import { isDocumentInventoryRow } from '@/src/lib/operationalExpiry';
 import type { BrandListItem, BrandRecord } from '@/src/types/brand';
 import type { BranchRecord } from '@/src/types/branch';
 import type { DocumentRecord } from '@/src/types/documents';
@@ -8,7 +10,6 @@ type OrgContext = {
   branches: BranchRecord[];
   staff: StaffMember[];
   documents: DocumentRecord[];
-  thresholdDays: number;
 };
 
 function getBrandBranchIds(brandId: string, branches: BranchRecord[]): Set<string> {
@@ -41,7 +42,7 @@ function countBrandDocuments(
   let expired = 0;
 
   for (const doc of context.documents) {
-    if (!doc.expiry_date) continue;
+    if (!isDocumentInventoryRow(doc)) continue;
 
     const matchesStaff = doc.type === 'staff' && doc.staff_id && staffIds.has(doc.staff_id);
     const matchesBranch =
@@ -49,9 +50,9 @@ function countBrandDocuments(
 
     if (!matchesStaff && !matchesBranch) continue;
 
-    const status = countDocStatus(doc.expiry_date, context.thresholdDays);
+    const status = uiStatusForDocument(doc);
     if (status === 'expired') expired += 1;
-    else if (status === 'expiring') expiring += 1;
+    else if (isSummaryExpiring(status)) expiring += 1;
   }
 
   return { expiring, expired };

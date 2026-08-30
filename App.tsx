@@ -6,13 +6,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AlertBadgeProvider } from '@/src/context/AlertBadgeContext';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext';
-import { NotificationProvider } from '@/src/context/NotificationContext';
 import { QueryProvider } from '@/src/providers/QueryProvider';
 import { isInvalidRefreshTokenMessage } from '@/src/lib/authSession';
-import { configureNotifications } from '@/src/lib/notifications';
 import {
   STARTUP_SPLASH_TIMEOUT_MS,
   startupLog,
@@ -29,11 +28,16 @@ LogBox.ignoreLogs([
   'Invalid Refresh Token',
   'Refresh Token Not Found',
   'AuthApiError',
+  'expo-notifications',
+  'Android Push notifications',
+  'not fully supported in Expo Go',
 ]);
 
+const originalConsoleWarn = console.warn.bind(console);
 const originalConsoleError = console.error.bind(console);
-console.error = (...args: unknown[]) => {
-  const text = args
+
+function formatConsoleArgs(args: unknown[]): string {
+  return args
     .map((arg) => {
       if (arg instanceof Error) {
         return arg.message;
@@ -48,25 +52,33 @@ console.error = (...args: unknown[]) => {
       }
     })
     .join(' ');
+}
 
-  if (isInvalidRefreshTokenMessage(text)) {
-    startupLog('Suppressed expected auth refresh error');
+function shouldSuppressRuntimeMessage(text: string): boolean {
+  return isInvalidRefreshTokenMessage(text) || /expo-notifications/i.test(text);
+}
+
+console.warn = (...args: unknown[]) => {
+  const text = formatConsoleArgs(args);
+  if (shouldSuppressRuntimeMessage(text)) {
+    startupLog('Suppressed expected runtime warning');
     return;
   }
+  originalConsoleWarn(...args);
+};
 
+console.error = (...args: unknown[]) => {
+  const text = formatConsoleArgs(args);
+  if (shouldSuppressRuntimeMessage(text)) {
+    startupLog('Suppressed expected runtime warning');
+    return;
+  }
   originalConsoleError(...args);
 };
 
 void SplashScreen.preventAutoHideAsync().catch((error) => {
   startupLog('preventAutoHideAsync skipped', error);
 });
-
-try {
-  configureNotifications();
-  startupLog('Notifications configured');
-} catch (error) {
-  startupLog('Notifications configure failed (non-blocking)', error);
-}
 
 async function hideSplashScreen(reason: string): Promise<void> {
   try {
@@ -121,21 +133,21 @@ function AppNavigation() {
   }, [isReady, hideSplashOnce]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer
         ref={navigationRef}
         onReady={() => {
           startupLog('NavigationContainer ready');
           flushPendingNotificationNavigation();
         }}>
-        <NotificationProvider>
-          <AlertBadgeProvider>
-            <RootNavigator authTimedOut={forceReady && authLoading} />
-            <StatusBar style="dark" />
-          </AlertBadgeProvider>
-        </NotificationProvider>
+        <AlertBadgeProvider>
+          <RootNavigator authTimedOut={forceReady && authLoading} />
+          <StatusBar style="dark" />
+        </AlertBadgeProvider>
       </NavigationContainer>
     </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

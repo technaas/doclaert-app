@@ -41,6 +41,7 @@ export function filterStaffList(
     return (
       member.name.toLowerCase().includes(search) ||
       (member.staff_id ?? '').toLowerCase().includes(search) ||
+      (member.email ?? '').toLowerCase().includes(search) ||
       branchName.includes(search) ||
       brandName.includes(search)
     );

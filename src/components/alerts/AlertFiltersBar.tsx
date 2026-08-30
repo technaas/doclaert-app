@@ -10,6 +10,7 @@ import { StyleSheet, View } from 'react-native';
 const STATUS_OPTIONS: FilterOption[] = [
   { value: 'all', label: 'All statuses' },
   { value: 'expiring', label: 'Expiring Soon' },
+  { value: 'critical', label: 'Critical' },
   { value: 'expired', label: 'Expired' },
 ];
 

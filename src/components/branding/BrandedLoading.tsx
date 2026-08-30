@@ -7,10 +7,10 @@ type BrandedLoadingProps = {
   showTagline?: boolean;
 };
 
-export function BrandedLoading({ showTagline = true }: BrandedLoadingProps) {
+export function BrandedLoading(_props?: BrandedLoadingProps) {
   return (
     <View style={styles.container}>
-      <DocAlertLogo size="lg" showTagline={showTagline} />
+      <DocAlertLogo variant="lockup" size="lg" />
       <ActivityIndicator
         style={styles.spinner}
         size="small"

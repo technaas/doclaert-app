@@ -12,6 +12,7 @@ type ListCardProps = {
   meta?: string;
   onPress?: () => void;
   tone?: ListCardTone;
+  leading?: ReactNode;
   badges?: ReactNode;
   footer?: ReactNode;
   accessibilityLabel?: string;
@@ -43,6 +44,7 @@ export function ListCard({
   meta,
   onPress,
   tone = 'default',
+  leading,
   badges,
   footer,
   accessibilityLabel,
@@ -51,7 +53,8 @@ export function ListCard({
 
   const content = (
     <View style={styles.inner}>
-        <View style={styles.header}>
+        <View style={[styles.header, leading ? styles.headerWithLeading : null]}>
+          {leading ? <View style={styles.leading}>{leading}</View> : null}
           <View style={styles.titleWrap}>
             <Text style={styles.title} numberOfLines={2}>
               {title}
@@ -121,8 +124,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  headerWithLeading: {
+    alignItems: 'center',
+  },
+  leading: {
+    marginTop: 1,
+  },
   titleWrap: {
     flex: 1,
+    minWidth: 0,
   },
   title: {
     fontSize: 16,

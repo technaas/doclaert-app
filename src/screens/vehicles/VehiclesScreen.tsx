@@ -14,8 +14,8 @@ import { EMPTY_STATES } from '@/src/constants/emptyStates';
 import { FLAT_LIST_PERF } from '@/src/constants/listConfig';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
-import { useCompanyDocumentsQuery } from '@/src/hooks/queries/useCompanyDocumentsQuery';
 import { useCompanyVehiclesData } from '@/src/hooks/useCompanyVehiclesData';
+import { isSummaryExpiring, isSummaryValid } from '@/src/lib/documentStatus';
 import { buildVehicleListItems, filterVehicleList } from '@/src/lib/vehicleFilters';
 import type { VehiclesStackParamList } from '@/src/navigation/VehiclesStack';
 import { DEFAULT_VEHICLE_FILTERS, type VehicleFilters } from '@/src/types/vehicles';
@@ -25,8 +25,6 @@ type Props = NativeStackScreenProps<VehiclesStackParamList, 'VehiclesList'>;
 export function VehiclesScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
-  const documentsQuery = useCompanyDocumentsQuery(companyId);
-  const alertThresholdDays = documentsQuery.data?.alertThresholdDays ?? 30;
 
   const {
     vehicles,
@@ -59,9 +57,8 @@ export function VehiclesScreen({ navigation, route }: Props) {
       buildVehicleListItems(vehicles, {
         branchById,
         brandById,
-        thresholdDays: alertThresholdDays,
       }),
-    [vehicles, branchById, brandById, alertThresholdDays],
+    [vehicles, branchById, brandById],
   );
 
   const filteredItems = useMemo(
@@ -74,9 +71,9 @@ export function VehiclesScreen({ navigation, route }: Props) {
     let expiringSoon = 0;
     let expired = 0;
     for (const item of filteredItems) {
-      if (item.displayStatus === 'active') valid += 1;
-      else if (item.displayStatus === 'expiring') expiringSoon += 1;
-      else if (item.displayStatus === 'expired') expired += 1;
+      if (item.displayStatus === 'expired') expired += 1;
+      else if (isSummaryExpiring(item.displayStatus)) expiringSoon += 1;
+      else if (isSummaryValid(item.displayStatus)) valid += 1;
     }
     return {
       total: filteredItems.length,

@@ -2,26 +2,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { ComponentProps } from 'react';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { DocumentsStackParamList } from '@/src/navigation/DocumentsStack';
-import type { VehiclesStackParamList } from '@/src/navigation/VehiclesStack';
-import { VehiclesStack } from '@/src/navigation/VehiclesStack';
 import type { StaffStackParamList } from '@/src/navigation/StaffStack';
+import type { BranchesStackParamList } from '@/src/navigation/BranchesStack';
+import { BranchesStack } from '@/src/navigation/BranchesStack';
 
 import { colors, shadows } from '@/src/constants/theme';
+import { PermissionGate } from '@/src/components/access/PermissionGate';
 import { DocumentsStack } from '@/src/navigation/DocumentsStack';
 import { StaffStack } from '@/src/navigation/StaffStack';
 import { DashboardScreen } from '@/src/screens/DashboardScreen';
 import { SalaryScreen } from '@/src/screens/salary/SalaryScreen';
 import { SettingsScreen } from '@/src/screens/SettingsScreen';
+import { useAuth } from '@/src/context/AuthContext';
+import { visibleMainTabs } from '@/src/lib/routePermissions';
 
 export type MainTabParamList = {
   Dashboard: undefined;
   Staff: NavigatorScreenParams<StaffStackParamList>;
   Salary: undefined;
   Documents: NavigatorScreenParams<DocumentsStackParamList>;
-  Vehicles: NavigatorScreenParams<VehiclesStackParamList>;
+  Branches: NavigatorScreenParams<BranchesStackParamList> | undefined;
   Settings: undefined;
 };
 
@@ -37,23 +40,32 @@ const TAB_CONFIG: Record<
   Staff: { icon: 'people-outline', iconFocused: 'people', label: 'Staff' },
   Salary: { icon: 'wallet-outline', iconFocused: 'wallet', label: 'Salary' },
   Documents: { icon: 'document-text-outline', iconFocused: 'document-text', label: 'Docs' },
-  Vehicles: { icon: 'car-outline', iconFocused: 'car', label: 'Fleet' },
+  Branches: { icon: 'git-branch-outline', iconFocused: 'git-branch', label: 'Branch' },
   Settings: { icon: 'settings-outline', iconFocused: 'settings', label: 'Settings' },
 };
 
 export function MainTabNavigator() {
+  const { profile } = useAuth();
+  const insets = useSafeAreaInsets();
+  const visible = visibleMainTabs(profile?.role);
+  const initialRouteName = visible[0] ?? 'Settings';
+  const show = (name: keyof MainTabParamList) => visible.includes(name);
+  const tabBarBottomInset = Math.max(insets.bottom, 8);
+
   return (
     <Tab.Navigator
+      initialRouteName={initialRouteName}
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
+        href: show(route.name) ? undefined : null,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSubtle,
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.borderLight,
           paddingTop: 4,
-          paddingBottom: Platform.OS === 'ios' ? 2 : 6,
-          height: Platform.OS === 'ios' ? 84 : 64,
+          paddingBottom: tabBarBottomInset,
+          height: 52 + tabBarBottomInset,
           ...shadows.cardSoft,
         },
         tabBarLabelStyle: {
@@ -73,11 +85,41 @@ export function MainTabNavigator() {
         },
         tabBarLabel: TAB_CONFIG[route.name].label,
       })}>
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Staff" component={StaffStack} />
-      <Tab.Screen name="Salary" component={SalaryScreen} />
-      <Tab.Screen name="Documents" component={DocumentsStack} />
-      <Tab.Screen name="Vehicles" component={VehiclesStack} />
+      <Tab.Screen name="Dashboard">
+        {() => (
+          <PermissionGate route="Dashboard">
+            <DashboardScreen />
+          </PermissionGate>
+        )}
+      </Tab.Screen>
+      <Tab.Screen name="Staff">
+        {() => (
+          <PermissionGate route="Staff">
+            <StaffStack />
+          </PermissionGate>
+        )}
+      </Tab.Screen>
+      <Tab.Screen name="Salary">
+        {() => (
+          <PermissionGate route="Salary">
+            <SalaryScreen />
+          </PermissionGate>
+        )}
+      </Tab.Screen>
+      <Tab.Screen name="Documents">
+        {() => (
+          <PermissionGate route="Documents">
+            <DocumentsStack />
+          </PermissionGate>
+        )}
+      </Tab.Screen>
+      <Tab.Screen name="Branches">
+        {() => (
+          <PermissionGate route="Branches">
+            <BranchesStack />
+          </PermissionGate>
+        )}
+      </Tab.Screen>
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

@@ -139,13 +139,10 @@ export async function runPushRegistrationTest(
       insertPayload: payload,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    pushLog('Registration test failed', { message, err });
-    console.error('[DocAlert push] Registration test failed', err);
+    pushLog('Registration test failed', err);
     return {
       success: false,
-      message,
-      error: message,
+      message: 'Could not enable push alerts right now. You can keep using the app as usual.',
     };
   }
 }

@@ -1,4 +1,4 @@
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import { useMemo, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -14,9 +14,10 @@ import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCompanyOrgData } from '@/src/hooks/useCompanyOrgData';
 import { buildBranchListItems, filterBranches } from '@/src/lib/branchMetrics';
-import type { AppStackParamList } from '@/src/navigation/AppStack';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'Branches'>;
+type BranchListNavigation = {
+  navigate: (name: 'BranchDetail', params: { branchId: string }) => void;
+};
 
 const STATUS_OPTIONS: FilterOption[] = [
   { value: 'all', label: 'All statuses' },
@@ -24,7 +25,8 @@ const STATUS_OPTIONS: FilterOption[] = [
   { value: 'inactive', label: 'Inactive' },
 ];
 
-export function BranchesScreen({ navigation }: Props) {
+export function BranchesScreen() {
+  const navigation = useNavigation<BranchListNavigation>();
   const { profile } = useAuth();
   const companyId = profile?.company_id;
   const { data, loading, refreshing, error, refresh, retry } = useCompanyOrgData(companyId);
@@ -47,7 +49,6 @@ export function BranchesScreen({ navigation }: Props) {
     const items = buildBranchListItems(data.branches, brandMap, {
       staff: data.staff,
       documents: data.documents,
-      thresholdDays: data.alertThresholdDays,
     });
     return filterBranches(items, search, brandFilter, statusFilter);
   }, [data, search, brandFilter, statusFilter]);

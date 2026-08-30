@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -50,12 +51,20 @@ export function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
-          <DocAlertLogo size="lg" showTagline />
+          <DocAlertLogo variant="lockup" size="lg" />
           <Text style={styles.heroSubtitle}>View-only access for your company data</Text>
         </View>
 
@@ -119,6 +128,7 @@ export function LoginScreen() {
             )}
           </Pressable>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -129,10 +139,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
   },
-  container: {
+  flex: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
     gap: spacing.xxl,
   },
   hero: {

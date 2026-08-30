@@ -7,6 +7,7 @@ import { formatPayDashboard } from '@/src/lib/format';
 type PeoplePayrollCardProps = {
   activeStaffCount: number;
   totalPay: number;
+  showSalary?: boolean;
   onPressActiveStaff?: () => void;
   onPressTotalPay?: () => void;
 };
@@ -74,6 +75,7 @@ function StatBlock({
 export function PeoplePayrollCard({
   activeStaffCount,
   totalPay,
+  showSalary = true,
   onPressActiveStaff,
   onPressTotalPay,
 }: PeoplePayrollCardProps) {
@@ -81,7 +83,7 @@ export function PeoplePayrollCard({
 
   return (
     <View style={styles.card} accessibilityLabel="People and Payroll">
-      <Text style={styles.cardTitle}>People & Payroll</Text>
+      <Text style={styles.cardTitle}>{showSalary ? 'People & Payroll' : 'People'}</Text>
 
       <View style={styles.statsRow}>
         <StatBlock
@@ -95,18 +97,21 @@ export function PeoplePayrollCard({
           accessibilityLabel={`Active Staff, ${activeStaffCount}`}
         />
 
-        <View style={styles.divider} />
-
-        <StatBlock
-          icon="wallet-outline"
-          iconBg={colors.primaryLight}
-          iconColor={colors.primary}
-          label="Total Pay"
-          value={payLabel}
-          labelColor={colors.primary}
-          onPress={onPressTotalPay}
-          accessibilityLabel={`Total Pay, ${payLabel}`}
-        />
+        {showSalary ? (
+          <>
+            <View style={styles.divider} />
+            <StatBlock
+              icon="wallet-outline"
+              iconBg={colors.primaryLight}
+              iconColor={colors.primary}
+              label="Total Pay"
+              value={payLabel}
+              labelColor={colors.primary}
+              onPress={onPressTotalPay}
+              accessibilityLabel={`Total Pay, ${payLabel}`}
+            />
+          </>
+        ) : null}
       </View>
     </View>
   );

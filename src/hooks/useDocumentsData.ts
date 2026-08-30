@@ -12,7 +12,7 @@ const EMPTY_BRANDS: Brand[] = [];
 const EMPTY_BRANCHES: Branch[] = [];
 const EMPTY_STAFF: StaffMember[] = [];
 
-export function useDocumentsData(companyId: string | undefined) {
+export function useDocumentsData(companyId: string | null | undefined) {
   const query = useCompanyDocumentsQuery(companyId);
   const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
   const data = query.data;
@@ -43,7 +43,6 @@ export function useDocumentsData(companyId: string | undefined) {
     staffById,
     branchById,
     brandById,
-    alertThresholdDays: data?.alertThresholdDays ?? 30,
     loading: isInitialLoading,
     refreshing: isRefreshing,
     error: companyId ? errorMessage : 'Company not found on your profile.',

@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { ExpiryFooter } from '@/src/components/ui/ExpiryFooter';
 import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
+import { listCardTone } from '@/src/lib/documentStatus';
 import {
   getAlertCardTone,
   getAlertStatusLabel,
@@ -16,7 +17,7 @@ type AlertCardProps = {
 
 function AlertCardComponent({ alert, onPress }: AlertCardProps) {
   const isExpired = alert.displayStatus === 'expired';
-  const tone = isExpired ? 'danger' : alert.displayStatus === 'expiring' ? 'warning' : 'default';
+  const tone = listCardTone(alert.displayStatus);
   const statusLabel = getAlertStatusLabel(alert.displayStatus, alert.daysRemaining);
   const badgeTone = getAlertCardTone(alert.displayStatus, alert.daysRemaining);
   const isVehicle = alert.kind === 'vehicle';

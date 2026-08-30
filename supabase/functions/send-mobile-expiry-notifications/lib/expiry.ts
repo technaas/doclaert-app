@@ -33,6 +33,23 @@ export function addDaysYmd(ymd: string, days: number): string {
   return `${y}-${m}-${d}`;
 }
 
+export function addCalendarMonths(iso: string, months: number): string | null {
+  const raw = iso.slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0))
+    .getUTCDate();
+  const clipped = Math.min(day, lastDay);
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(clipped).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function isExpired(expiry: string, todayYmd: string): boolean {
   return daysUntilExpiry(expiry, todayYmd) < 0;
 }

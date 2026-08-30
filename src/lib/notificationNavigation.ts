@@ -35,11 +35,10 @@ function normalizeType(data: Record<string, unknown>): string | undefined {
 
 function normalizeAlertStatus(
   raw: unknown,
-): AlertFilters['status'] | undefined {
+): NotificationPayload['status'] {
   if (typeof raw !== 'string') return undefined;
   const status = raw.toLowerCase();
-  if (status === 'expiring') return 'expiring';
-  if (status === 'expired') return 'expired';
+  if (status === 'expiring' || status === 'expired') return status;
   return undefined;
 }
 
@@ -57,6 +56,7 @@ export function resolveNotificationNavigationTarget(
     payload.alert_screen === true ||
     type === 'staff' ||
     type === 'branch' ||
+    type === 'vehicle' ||
     type === 'test';
 
   if (!shouldOpenAlerts) {
@@ -64,7 +64,7 @@ export function resolveNotificationNavigationTarget(
   }
 
   const tab: AlertFilters['tab'] =
-    type === 'staff' || type === 'branch' ? type : 'all';
+    type === 'staff' || type === 'branch' || type === 'vehicle' ? type : 'all';
   const status = payload.status ?? 'all';
 
   return { screen: 'Alerts', tab, status };

@@ -1,3 +1,4 @@
+import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -10,11 +11,19 @@ import { colors, radius, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useCompanyOrgData } from '@/src/hooks/useCompanyOrgData';
 import { buildBranchListItems, getBranchDetailLicenses } from '@/src/lib/branchMetrics';
+import { hasUploadedDocumentFile } from '@/src/lib/documentFile';
 import { formatCount } from '@/src/lib/format';
-import { DOCUMENT_STATUS_LABEL } from '@/src/lib/documentStatus';
-import type { AppStackParamList } from '@/src/navigation/AppStack';
+import { findKuwaitArea, formatBranchLocation, kuwaitGovernorateById } from '@/src/lib/kuwait-locations';
+import {
+  DOCUMENT_STATUS_LABEL,
+  statusBadgeTone,
+} from '@/src/lib/documentStatus';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'BranchDetail'>;
+type BranchDetailParams = {
+  BranchDetail: { branchId: string };
+};
+
+type Props = NativeStackScreenProps<BranchDetailParams, 'BranchDetail'>;
 
 export function BranchDetailScreen({ route, navigation }: Props) {
   const { branchId } = route.params;
@@ -29,7 +38,6 @@ export function BranchDetailScreen({ route, navigation }: Props) {
     const items = buildBranchListItems(data.branches, brandMap, {
       staff: data.staff,
       documents: data.documents,
-      thresholdDays: data.alertThresholdDays,
     });
     const branch = items.find((item) => item.id === branchId);
     if (!branch) return null;
@@ -44,11 +52,7 @@ export function BranchDetailScreen({ route, navigation }: Props) {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    const licenses = getBranchDetailLicenses(
-      branchId,
-      data.documents,
-      data.alertThresholdDays,
-    );
+    const licenses = getBranchDetailLicenses(branchId, data.documents);
 
     return { branch, staff, licenses };
   }, [data, branchId]);
@@ -76,12 +80,15 @@ export function BranchDetailScreen({ route, navigation }: Props) {
       : (branch.status ?? '') === 'inactive'
         ? 'muted'
         : 'default';
-
-  const licenseTone = (status: string) => {
-    if (status === 'expired') return 'danger' as const;
-    if (status === 'expiring') return 'warning' as const;
-    return 'success' as const;
-  };
+  const governorateName =
+    kuwaitGovernorateById((branch.governorate ?? '').trim())?.name ||
+    branch.governorate ||
+    '—';
+  const areaName =
+    findKuwaitArea((branch.governorate ?? '').trim(), (branch.area ?? '').trim())?.name ||
+    branch.area ||
+    '—';
+  const locationDisplay = formatBranchLocation(branch) || branch.location || '—';
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -89,14 +96,15 @@ export function BranchDetailScreen({ route, navigation }: Props) {
         <Text style={styles.sectionTitle}>Branch</Text>
         <DetailRow label="Name" value={branch.name} />
         <DetailRow label="Brand" value={branch.brandName} />
-        <DetailRow label="Location" value={branch.location ?? '—'} />
+        <DetailRow label="Governorate" value={governorateName} />
+        <DetailRow label="Area" value={areaName} />
+        <DetailRow label="Location" value={locationDisplay} />
         <DetailRow label="Full address" value={branch.full_address ?? '—'} />
         <DetailRow label="Manager" value={branch.manager_name ?? '—'} />
         <DetailRow label="Manager contact" value={branch.manager_contact ?? '—'} />
-        <View style={styles.statusRow}>
-          <Text style={styles.statusLabel}>Status</Text>
+        <DetailRow label="Status">
           <StatusBadge label={branch.status ?? '—'} tone={statusTone} />
-        </View>
+        </DetailRow>
       </View>
 
       <View style={styles.section}>
@@ -139,21 +147,44 @@ export function BranchDetailScreen({ route, navigation }: Props) {
             icon="document-text-outline"
           />
         ) : (
-          licenses.map((license) => (
-            <Pressable
-              key={license.id}
-              style={styles.listRow}
-              onPress={() =>
-                navigation.navigate('DocumentDetail', { documentId: license.id })
-              }>
-              <Text style={styles.listTitle}>{license.documentLabel}</Text>
-              <Text style={styles.listMeta}>Expiry: {license.expiry_date ?? '—'}</Text>
-              <StatusBadge
-                label={DOCUMENT_STATUS_LABEL[license.displayStatus]}
-                tone={licenseTone(license.displayStatus)}
-              />
-            </Pressable>
-          ))
+          licenses.map((license) => {
+            const hasFile = hasUploadedDocumentFile(license.file_url);
+            const body = (
+              <>
+                <Text style={styles.listTitle}>{license.documentLabel}</Text>
+                <Text style={styles.listMeta}>Expiry: {license.expiry_date ?? '—'}</Text>
+                  <StatusBadge
+                    label={DOCUMENT_STATUS_LABEL[license.displayStatus]}
+                    tone={statusBadgeTone(license.displayStatus)}
+                  />
+                {!hasFile ? <Text style={styles.listMeta}>No file uploaded</Text> : null}
+              </>
+            );
+
+            if (!hasFile) {
+              return (
+                <View key={license.id} style={styles.listRow}>
+                  {body}
+                </View>
+              );
+            }
+
+            return (
+              <Pressable
+                key={license.id}
+                style={styles.listRow}
+                onPress={() =>
+                  navigation.dispatch(
+                    CommonActions.navigate({
+                      name: 'DocumentDetail',
+                      params: { documentId: license.id },
+                    }),
+                  )
+                }>
+                {body}
+              </Pressable>
+            );
+          })
         )}
       </View>
     </ScrollView>

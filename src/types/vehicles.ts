@@ -3,6 +3,8 @@ import type { DocumentDisplayStatus } from '@/src/types/documents';
 export type VehicleRecord = {
   id: string;
   company_id: string;
+  company_name: string | null;
+  number: string | null;
   vehicle_make: string;
   model: string;
   plate_number: string;
@@ -13,6 +15,9 @@ export type VehicleRecord = {
   year_of_manufacture: number | null;
   daftar_expiry_date: string | null;
   daftar_file_url: string | null;
+  driver_name: string | null;
+  driver_civil_id_number: string | null;
+  driver_civil_id_file_url: string | null;
   brand_id: string;
   branch_id: string;
   status: string;
@@ -20,6 +25,8 @@ export type VehicleRecord = {
 
 export type VehicleListItem = {
   id: string;
+  companyName: string | null;
+  fleetNumber: string | null;
   vehicleMake: string;
   model: string;
   plateNumber: string;

@@ -1,7 +1,7 @@
 import { useCompanyOrgQuery } from '@/src/hooks/queries/useCompanyOrgQuery';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
 
-export function useCompanyOrgData(companyId: string | undefined) {
+export function useCompanyOrgData(companyId: string | null | undefined) {
   const query = useCompanyOrgQuery(companyId);
   const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
 

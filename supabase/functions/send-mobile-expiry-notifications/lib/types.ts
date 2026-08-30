@@ -1,4 +1,4 @@
-export type NotificationCategory = "staff" | "branch" | "test";
+export type NotificationCategory = "staff" | "branch" | "vehicle" | "test";
 
 export interface DocumentRow {
   id: string;
@@ -7,7 +7,23 @@ export interface DocumentRow {
   staff_id: string | null;
   branch_id: string | null;
   document_name: string | null;
-  expiry_date: string;
+  expiry_date: string | null;
+  expiry_status: string | null;
+  file_url: string | null;
+  status: string | null;
+}
+
+export interface VehicleRow {
+  id: string;
+  brand_id: string | null;
+  branch_id: string | null;
+  vehicle_make: string | null;
+  model: string | null;
+  registration_number: string | null;
+  duftar_expiry_date: string | null;
+  daftar_expiry_date: string | null;
+  duftar_file_url: string | null;
+  daftar_file_url: string | null;
   status: string | null;
 }
 

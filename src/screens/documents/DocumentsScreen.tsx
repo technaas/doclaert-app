@@ -1,3 +1,4 @@
+import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -15,7 +16,7 @@ import { FLAT_LIST_PERF } from '@/src/constants/listConfig';
 import { colors, spacing } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDocumentsData } from '@/src/hooks/useDocumentsData';
-import { buildDocumentListItems, filterDocumentList } from '@/src/lib/documentFilters';
+import { buildDocumentListItems, countDocumentSummary, filterDocumentList } from '@/src/lib/documentFilters';
 import {
   isVehicleDaftarDocumentId,
   vehicleIdFromDaftarDocumentId,
@@ -41,7 +42,6 @@ export function DocumentsScreen({ navigation, route }: Props) {
     staffById,
     branchById,
     brandById,
-    alertThresholdDays,
     loading,
     refreshing,
     error,
@@ -67,39 +67,26 @@ export function DocumentsScreen({ navigation, route }: Props) {
       staffById,
       branchById,
       brandById,
-      thresholdDays: alertThresholdDays,
     };
     const documentItems = buildDocumentListItems(documents, context);
     const vehicleItems = buildVehicleDaftarDocumentItems(vehicles, {
       branchById,
       brandById,
-      thresholdDays: alertThresholdDays,
     });
     return [...documentItems, ...vehicleItems].sort((a, b) =>
       (a.expiryDate ?? '').localeCompare(b.expiryDate ?? ''),
     );
-  }, [documents, vehicles, staffById, branchById, brandById, alertThresholdDays]);
+  }, [documents, vehicles, staffById, branchById, brandById]);
 
   const filteredItems = useMemo(
     () => filterDocumentList(allItems, filters),
     [allItems, filters],
   );
 
-  const summaryCounts = useMemo(() => {
-    let valid = 0;
-    let expiringSoon = 0;
-    let expired = 0;
-    for (const item of filteredItems) {
-      if (item.displayStatus === 'active') valid += 1;
-      else if (item.displayStatus === 'expiring') expiringSoon += 1;
-      else if (item.displayStatus === 'expired') expired += 1;
-    }
-    return {
-      valid,
-      expiringSoon,
-      expired,
-    };
-  }, [filteredItems]);
+  const summaryCounts = useMemo(
+    () => countDocumentSummary(filteredItems),
+    [filteredItems],
+  );
 
   const updateFilters = (patch: Partial<DocumentFilters>) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -107,9 +94,12 @@ export function DocumentsScreen({ navigation, route }: Props) {
 
   const openDocumentItem = (itemId: string) => {
     if (isVehicleDaftarDocumentId(itemId)) {
-      navigation.getParent()?.navigate('VehicleDetail', {
-        vehicleId: vehicleIdFromDaftarDocumentId(itemId),
-      });
+      navigation.dispatch(
+        CommonActions.navigate({
+          name: 'VehicleDetail',
+          params: { vehicleId: vehicleIdFromDaftarDocumentId(itemId) },
+        }),
+      );
       return;
     }
     navigation.navigate('DocumentDetail', { documentId: itemId });

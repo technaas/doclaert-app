@@ -1,11 +1,12 @@
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { StaffPortrait } from '@/src/components/staff/StaffPortrait';
 import { ListCard } from '@/src/components/ui/ListCard';
 import { StatusBadge } from '@/src/components/ui/StatusBadge';
 import { colors } from '@/src/constants/theme';
+import { formatKuwaitContact, formatNativeContactFromStaff } from '@/src/lib/staffContact';
 import {
-  formatContactNumber,
   formatStaffType,
 } from '@/src/lib/staffDisplay';
 import { isPartTimeType } from '@/src/lib/staffFilters';
@@ -18,7 +19,11 @@ type StaffCardProps = {
 
 function StaffCardComponent({ staff, onPress }: StaffCardProps) {
   const showPartTime = isPartTimeType(staff.staff_type);
-  const contactNumber = formatContactNumber(staff.contact_number);
+  const contactNumber =
+    formatKuwaitContact(staff.kuwait_contact_number) ||
+    formatNativeContactFromStaff(staff) ||
+    staff.contact_number?.trim() ||
+    null;
   const statusTone =
     (staff.status ?? '').toLowerCase() === 'active'
       ? 'success'
@@ -39,6 +44,7 @@ function StaffCardComponent({ staff, onPress }: StaffCardProps) {
       subtitle={subtitle}
       meta={`${staff.brandName} · ${staff.branchName}`}
       onPress={onPress}
+      leading={<StaffPortrait photoUrl={staff.photo_url} name={staff.name} size="compact" />}
       badges={<StatusBadge label={staff.status ?? '—'} tone={statusTone} size="sm" />}
       footer={
         contactNumber || showPartTime ? (

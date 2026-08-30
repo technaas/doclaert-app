@@ -38,7 +38,6 @@ export function BrandsScreen({ navigation }: Props) {
       branches: data.branches,
       staff: data.staff,
       documents: data.documents,
-      thresholdDays: data.alertThresholdDays,
     });
     return filterBrands(items, search, statusFilter);
   }, [data, search, statusFilter]);

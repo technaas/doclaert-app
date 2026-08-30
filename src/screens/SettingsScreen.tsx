@@ -19,6 +19,8 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useNotifications } from '@/src/context/NotificationContext';
 import { cardStyle, colors, radius, spacing, typography } from '@/src/constants/theme';
 import { useCompanyProfile } from '@/src/hooks/useCompanyProfile';
+import { useSubscriptionGate } from '@/src/hooks/useSubscriptionGate';
+import { isTechnicalPushMessage, PUSH_USER_SYNC_FAILED } from '@/src/lib/pushAvailability';
 import { displayField } from '@/src/lib/staffDisplay';
 import type { NotificationPermissionStatus } from '@/src/types/notifications';
 
@@ -51,7 +53,12 @@ function formatSyncStatus(
   if (syncStatus === 'success' && lastSyncedAt) {
     return `Last synced ${new Date(lastSyncedAt).toLocaleString()}`;
   }
-  if (syncStatus === 'error') return lastSyncError ?? 'Sync failed';
+  if (syncStatus === 'error') {
+    if (lastSyncError && !isTechnicalPushMessage(lastSyncError)) {
+      return lastSyncError;
+    }
+    return PUSH_USER_SYNC_FAILED;
+  }
   return 'Not synced yet';
 }
 
@@ -85,8 +92,9 @@ function SettingsRow({
 
 export function SettingsScreen() {
   const { user, profile, logout } = useAuth();
-  const companyId = profile?.company_id;
+  const companyId = profile?.company_id ?? undefined;
   const { profile: companyProfile, loading: companyLoading } = useCompanyProfile(companyId);
+  const subscription = useSubscriptionGate(companyId, Boolean(companyId));
   const {
     permissionStatus,
     pushEnabled,
@@ -134,23 +142,11 @@ export function SettingsScreen() {
     setPushActionLoading(true);
     try {
       const result = await testPushRegistration();
-      const detail = [
-        result.message,
-        result.permissionStatus ? `Permission: ${result.permissionStatus}` : null,
-        result.tokenValid !== undefined ? `Token valid: ${result.tokenValid}` : null,
-        result.syncAction ? `Action: ${result.syncAction}` : null,
-        result.rowId ? `Row: ${result.rowId}` : null,
-        result.error ? `Error: ${result.error}` : null,
-        result.supabaseResponse
-          ? `Response: ${JSON.stringify(result.supabaseResponse, null, 2)}`
-          : null,
-      ]
-        .filter(Boolean)
-        .join('\n\n');
-
       Alert.alert(
-        result.success ? 'Push registration test OK' : 'Push registration test failed',
-        detail.slice(0, 2000),
+        result.success ? 'Push alerts' : 'Push alerts unavailable',
+        result.success
+          ? 'Push alerts are set up on this device.'
+          : result.message,
       );
     } finally {
       setPushActionLoading(false);
@@ -242,6 +238,14 @@ export function SettingsScreen() {
           <Text style={styles.cardTitle}>Account</Text>
           <SettingsRow label="User" value={user?.email ?? '—'} />
           <SettingsRow label="Role" value={profile?.role ?? '—'} />
+          <SettingsRow
+            label="Subscription"
+            value={subscription.subscription?.status ?? '—'}
+          />
+          <SettingsRow
+            label="Subscription end"
+            value={subscription.subscription?.end_date ?? '—'}
+          />
           <SettingsRow label="App version" value={appVersion} />
         </View>
 

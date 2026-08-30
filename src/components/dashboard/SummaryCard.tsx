@@ -19,6 +19,7 @@ type SummaryCardProps = {
   subtitle?: string;
   breakdown?: DocumentCountBreakdown;
   fullWidth?: boolean;
+  compact?: boolean;
   onPress?: () => void;
 };
 
@@ -80,6 +81,7 @@ export function SummaryCard({
   subtitle,
   breakdown,
   fullWidth = false,
+  compact = false,
   onPress,
 }: SummaryCardProps) {
   const toneStyle = TONE_STYLES[tone];
@@ -88,21 +90,21 @@ export function SummaryCard({
   const content = (
     <>
       <View style={styles.header}>
-        <View style={[styles.iconWrap, { backgroundColor: toneStyle.iconBg }]}>
-          <Ionicons name={icon} size={22} color={toneStyle.iconColor} />
+        <View style={[styles.iconWrap, compact && styles.iconWrapCompact, { backgroundColor: toneStyle.iconBg }]}>
+          <Ionicons name={icon} size={compact ? 18 : 22} color={toneStyle.iconColor} />
         </View>
         <View style={styles.headerText}>
           <Text style={[styles.label, { color: toneStyle.labelColor }]}>{label}</Text>
           {total !== null ? (
-            <Text style={[styles.value, { color: toneStyle.valueColor }]}>
+            <Text style={[styles.value, compact && styles.valueCompact, { color: toneStyle.valueColor }]}>
               {total.toLocaleString()}
             </Text>
           ) : value ? (
             <Text
-              style={[styles.value, { color: toneStyle.valueColor }]}
+              style={[styles.value, compact && styles.valueCompact, { color: toneStyle.valueColor }]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}>
+              minimumFontScale={0.7}>
               {value}
             </Text>
           ) : null}
@@ -131,6 +133,7 @@ export function SummaryCard({
       <Pressable
         style={({ pressed }) => [
           styles.card,
+          compact && styles.cardCompact,
           fullWidth && styles.cardFull,
           cardSurfaceStyle,
           pressed && styles.cardPressed,
@@ -144,7 +147,7 @@ export function SummaryCard({
   }
 
   return (
-    <View style={[styles.card, fullWidth && styles.cardFull, cardSurfaceStyle]}>{content}</View>
+    <View style={[styles.card, compact && styles.cardCompact, fullWidth && styles.cardFull, cardSurfaceStyle]}>{content}</View>
   );
 }
 
@@ -157,6 +160,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
     ...shadows.cardSoft,
+  },
+  cardCompact: {
+    minWidth: 0,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
   cardFull: {
     flex: undefined,
@@ -179,6 +187,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconWrapCompact: {
+    width: 36,
+    height: 36,
+  },
   headerText: {
     flex: 1,
     minWidth: 0,
@@ -194,6 +206,10 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     letterSpacing: -0.8,
+  },
+  valueCompact: {
+    fontSize: 22,
+    letterSpacing: -0.4,
   },
   subtitle: {
     fontSize: 12,

@@ -8,7 +8,7 @@ const EMPTY_BRANDS: Brand[] = [];
 const EMPTY_BRANCHES: Branch[] = [];
 const EMPTY_STAFF: StaffMember[] = [];
 
-export function useCompanyStaffData(companyId: string | undefined) {
+export function useCompanyStaffData(companyId: string | null | undefined) {
   const query = useCompanyStaffQuery(companyId);
   const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
   const data = query.data;

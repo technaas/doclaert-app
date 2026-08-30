@@ -1,18 +1,25 @@
-import { getDocumentDisplayStatus } from '@/src/lib/documentStatus';
-import { getUrgencyGroup } from '@/src/lib/alertUrgency';
 import { getDocumentLabel } from '@/src/constants/documents';
-import { daysUntilExpiry } from '@/src/lib/expiry';
+import { getUrgencyGroup } from '@/src/lib/alertUrgency';
+import {
+  daysRemainingForDocument,
+  isAlertStatus,
+  matchesStatusFilter,
+  uiStatusForDocument,
+} from '@/src/lib/documentStatus';
+import { isDocumentInventoryRow } from '@/src/lib/operationalExpiry';
 import type { AlertFilters, AlertListItem } from '@/src/types/alerts';
 import type { DocumentRecord } from '@/src/types/documents';
 import type { Branch, Brand, StaffMember } from '@/src/types/staff';
 import type { VehicleRecord } from '@/src/types/vehicles';
-import { buildVehicleDaftarAlertItems, countVehicleDaftarAlerts } from '@/src/lib/vehicleDocumentItems';
+import {
+  buildVehicleDaftarAlertItems,
+  countVehicleDaftarAlerts,
+} from '@/src/lib/vehicleDocumentItems';
 
 type LookupContext = {
   staffById: Map<string, StaffMember>;
   branchById: Map<string, Branch>;
   brandById: Map<string, Brand>;
-  thresholdDays: number;
 };
 
 export function buildAlertListItems(
@@ -22,12 +29,12 @@ export function buildAlertListItems(
   const items: AlertListItem[] = [];
 
   for (const doc of documents) {
-    if (!doc.expiry_date) continue;
+    if (!isDocumentInventoryRow(doc)) continue;
 
-    const displayStatus = getDocumentDisplayStatus(doc.expiry_date, context.thresholdDays);
-    if (displayStatus !== 'expired' && displayStatus !== 'expiring') continue;
+    const displayStatus = uiStatusForDocument(doc);
+    if (!isAlertStatus(displayStatus)) continue;
 
-    const daysRemaining = daysUntilExpiry(doc.expiry_date);
+    const daysRemaining = daysRemainingForDocument(doc);
     const urgencyGroup = getUrgencyGroup(daysRemaining, displayStatus);
     if (!urgencyGroup) continue;
 
@@ -74,22 +81,6 @@ export function buildAlertListItems(
         displayStatus,
         urgencyGroup,
       });
-    } else if (doc.type === 'vehicle') {
-      items.push({
-        id: doc.id,
-        kind: 'vehicle',
-        documentLabel: getDocumentLabel(doc.document_name),
-        typeLabel: 'Vehicle Daftar',
-        linkedTo: '—',
-        brandId: '',
-        brandName: '—',
-        branchId: doc.branch_id ?? '',
-        branchName: '—',
-        expiryDate: doc.expiry_date,
-        daysRemaining,
-        displayStatus,
-        urgencyGroup,
-      });
     }
   }
 
@@ -123,7 +114,7 @@ export function filterAlertList(items: AlertListItem[], filters: AlertFilters): 
     if (filters.tab === 'vehicle' && item.kind !== 'vehicle') return false;
     if (filters.brandId !== 'all' && item.brandId !== filters.brandId) return false;
     if (filters.branchId !== 'all' && item.branchId !== filters.branchId) return false;
-    if (filters.status !== 'all' && item.displayStatus !== filters.status) return false;
+    if (!matchesStatusFilter(item.displayStatus, filters.status)) return false;
 
     if (!search) return true;
 
@@ -140,14 +131,12 @@ export function filterAlertList(items: AlertListItem[], filters: AlertFilters): 
 
 export function countDocumentAlerts(
   documents: DocumentRecord[],
-  thresholdDays: number,
   vehicles: VehicleRecord[] = [],
 ): number {
   let count = 0;
   for (const doc of documents) {
-    if (!doc.expiry_date) continue;
-    const status = getDocumentDisplayStatus(doc.expiry_date, thresholdDays);
-    if (status === 'expired' || status === 'expiring') count += 1;
+    if (!isDocumentInventoryRow(doc)) continue;
+    if (isAlertStatus(uiStatusForDocument(doc))) count += 1;
   }
-  return count + countVehicleDaftarAlerts(vehicles, thresholdDays);
+  return count + countVehicleDaftarAlerts(vehicles);
 }

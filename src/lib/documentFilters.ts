@@ -1,6 +1,11 @@
-import { getDocumentDisplayStatus } from '@/src/lib/documentStatus';
-import { daysUntilExpiry } from '@/src/lib/expiry';
 import { getDocumentLabel } from '@/src/constants/documents';
+import {
+  daysRemainingForDocument,
+  isSummaryExpiring,
+  matchesStatusFilter,
+  uiStatusForDocument,
+} from '@/src/lib/documentStatus';
+import { isDocumentInventoryRow } from '@/src/lib/operationalExpiry';
 import type {
   DocumentFilters,
   DocumentListItem,
@@ -12,8 +17,23 @@ type LookupContext = {
   staffById: Map<string, StaffMember>;
   branchById: Map<string, Branch>;
   brandById: Map<string, Brand>;
-  thresholdDays: number;
 };
+
+function pushItem(
+  items: DocumentListItem[],
+  doc: DocumentRecord,
+  fields: Omit<DocumentListItem, 'id' | 'documentName' | 'documentLabel' | 'expiryDate' | 'daysRemaining' | 'displayStatus'>,
+) {
+  items.push({
+    ...fields,
+    id: doc.id,
+    documentName: doc.document_name,
+    documentLabel: getDocumentLabel(doc.document_name),
+    expiryDate: doc.expiry_date,
+    daysRemaining: daysRemainingForDocument(doc),
+    displayStatus: uiStatusForDocument(doc),
+  });
+}
 
 export function buildDocumentListItems(
   documents: DocumentRecord[],
@@ -22,6 +42,8 @@ export function buildDocumentListItems(
   const items: DocumentListItem[] = [];
 
   for (const doc of documents) {
+    if (!isDocumentInventoryRow(doc)) continue;
+
     if (doc.type === 'staff' && doc.staff_id) {
       const staff = context.staffById.get(doc.staff_id);
       const branch = staff ? context.branchById.get(staff.branch_id) : undefined;
@@ -31,59 +53,27 @@ export function buildDocumentListItems(
           ? context.brandById.get(staff.brand_id)
           : undefined;
 
-      const displayStatus = getDocumentDisplayStatus(doc.expiry_date, context.thresholdDays);
-
-      items.push({
-        id: doc.id,
+      pushItem(items, doc, {
         kind: 'staff',
-        documentName: doc.document_name,
-        documentLabel: getDocumentLabel(doc.document_name),
         linkedTo: staff?.name ?? '—',
         ownerId: doc.staff_id,
         brandId: brand?.id ?? '',
         brandName: brand?.name ?? '—',
         branchId: branch?.id ?? '',
         branchName: branch?.name ?? '—',
-        expiryDate: doc.expiry_date,
-        daysRemaining: doc.expiry_date ? daysUntilExpiry(doc.expiry_date) : null,
-        displayStatus,
       });
     } else if (doc.type === 'branch' && doc.branch_id) {
       const branch = context.branchById.get(doc.branch_id);
       const brand = branch ? context.brandById.get(branch.brand_id) : undefined;
-      const displayStatus = getDocumentDisplayStatus(doc.expiry_date, context.thresholdDays);
 
-      items.push({
-        id: doc.id,
+      pushItem(items, doc, {
         kind: 'branch',
-        documentName: doc.document_name,
-        documentLabel: getDocumentLabel(doc.document_name),
         linkedTo: branch?.name ?? '—',
         ownerId: doc.branch_id,
         brandId: brand?.id ?? '',
         brandName: brand?.name ?? '—',
         branchId: branch?.id ?? '',
         branchName: branch?.name ?? '—',
-        expiryDate: doc.expiry_date,
-        daysRemaining: doc.expiry_date ? daysUntilExpiry(doc.expiry_date) : null,
-        displayStatus,
-      });
-    } else if (doc.type === 'vehicle') {
-      const displayStatus = getDocumentDisplayStatus(doc.expiry_date, context.thresholdDays);
-      items.push({
-        id: doc.id,
-        kind: 'vehicle',
-        documentName: doc.document_name,
-        documentLabel: getDocumentLabel(doc.document_name),
-        linkedTo: '—',
-        ownerId: doc.staff_id ?? doc.branch_id ?? doc.id,
-        brandId: '',
-        brandName: '—',
-        branchId: doc.branch_id ?? '',
-        branchName: '—',
-        expiryDate: doc.expiry_date,
-        daysRemaining: doc.expiry_date ? daysUntilExpiry(doc.expiry_date) : null,
-        displayStatus,
       });
     }
   }
@@ -103,7 +93,7 @@ export function filterDocumentList(
     if (filters.tab === 'vehicle' && item.kind !== 'vehicle') return false;
     if (filters.brandId !== 'all' && item.brandId !== filters.brandId) return false;
     if (filters.branchId !== 'all' && item.branchId !== filters.branchId) return false;
-    if (filters.status !== 'all' && item.displayStatus !== filters.status) return false;
+    if (!matchesStatusFilter(item.displayStatus, filters.status)) return false;
 
     if (!search) return true;
 
@@ -117,4 +107,22 @@ export function filterDocumentList(
       (item.vehicleModel?.toLowerCase().includes(search) ?? false)
     );
   });
+}
+
+export function countDocumentSummary(items: DocumentListItem[]): {
+  valid: number;
+  expiringSoon: number;
+  expired: number;
+} {
+  let valid = 0;
+  let expiringSoon = 0;
+  let expired = 0;
+  for (const item of items) {
+    if (item.displayStatus === 'expired') expired += 1;
+    else if (isSummaryExpiring(item.displayStatus)) expiringSoon += 1;
+    else if (item.displayStatus === 'valid' || item.displayStatus === 'non_expiring') {
+      valid += 1;
+    }
+  }
+  return { valid, expiringSoon, expired };
 }

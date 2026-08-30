@@ -1,5 +1,7 @@
 import type { DocumentDisplayStatus } from '@/src/types/documents';
 import type { AlertUrgencyGroup } from '@/src/types/alerts';
+import { isAlertStatus, isSummaryExpiring } from '@/src/lib/documentStatus';
+import { CRITICAL_DAYS } from '@/src/lib/expiry';
 
 export const URGENCY_GROUP_LABELS: Record<AlertUrgencyGroup, string> = {
   expired: 'Expired',
@@ -21,7 +23,7 @@ export function getUrgencyGroup(
   displayStatus: DocumentDisplayStatus,
 ): AlertUrgencyGroup | null {
   if (displayStatus === 'expired') return 'expired';
-  if (days === null || displayStatus !== 'expiring') return null;
+  if (days === null || !isSummaryExpiring(displayStatus)) return null;
   if (days === 0) return 'due_today';
   if (days >= 1 && days <= 3) return 'days_1_3';
   if (days >= 4 && days <= 7) return 'days_4_7';
@@ -34,15 +36,18 @@ export function getAlertCardTone(
   days: number | null,
 ): 'danger' | 'warning' | 'critical' {
   if (displayStatus === 'expired') return 'danger';
-  if (days !== null && days >= 0 && days <= 3) return 'critical';
+  if (displayStatus === 'critical' || (days !== null && days >= 0 && days <= CRITICAL_DAYS)) {
+    return 'critical';
+  }
   return 'warning';
 }
 
 export function getAlertStatusLabel(
   displayStatus: DocumentDisplayStatus,
-  days: number | null,
+  _days: number | null,
 ): string {
   if (displayStatus === 'expired') return 'Expired';
-  if (days !== null && days >= 0 && days <= 3) return 'Critical';
+  if (displayStatus === 'critical') return 'Critical';
+  if (isAlertStatus(displayStatus)) return 'Expiring Soon';
   return 'Expiring Soon';
 }

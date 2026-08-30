@@ -27,7 +27,6 @@ export function BrandDetailScreen({ route }: Props) {
       branches: data.branches,
       staff: data.staff,
       documents: data.documents,
-      thresholdDays: data.alertThresholdDays,
     });
     const found = items.find((item) => item.id === brandId);
     if (!found) return null;

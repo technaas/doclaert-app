@@ -4,7 +4,7 @@
 // rows in email_notification_settings and applies each company's:
 //   enabled, alert_threshold_days, repeat_interval_days
 //
-// Per active device: max 1 staff + 1 branch summary per repeat_interval_days.
+// Per active device: max 1 staff + 1 branch + 1 vehicle summary per repeat_interval_days.
 //
 // Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Production: POST {} — see supabase/scheduled/cron-send-mobile-expiry-notifications.sql
@@ -162,7 +162,7 @@ async function processCompany(
     `[mobile-expiry] company=${companyId} threshold=${alertThresholdDays}d repeat=${repeatIntervalDays}d`,
   );
 
-  const { docs, error: docErr } = await fetchAlertDocuments(
+  const { docs, vehicles, error: docErr } = await fetchAlertDocuments(
     admin,
     companyId,
     alertThresholdDays,
@@ -171,15 +171,11 @@ async function processCompany(
     stats.errors.push(docErr);
     return;
   }
-  if (!docs.length) {
-    console.log(`[mobile-expiry] company=${companyId} no documents in alert window`);
-    return;
-  }
 
   await loadCompanyLookups(admin, companyId, docs);
 
   const todayYmd = todayKuwaitYmd();
-  const counts = countByCategory(docs, alertThresholdDays, todayYmd);
+  const counts = countByCategory(docs, vehicles, alertThresholdDays, todayYmd);
 
   const categories: {
     key: NotificationCategory;
@@ -187,16 +183,17 @@ async function processCompany(
   }[] = [
     { key: "staff", counts: counts.staff },
     { key: "branch", counts: counts.branch },
+    { key: "vehicle", counts: counts.vehicle },
   ];
 
   const hasAlerts = categories.some((c) => c.counts.total > 0);
   if (!hasAlerts) {
-    console.log(`[mobile-expiry] company=${companyId} no staff/branch alerts after filter`);
+    console.log(`[mobile-expiry] company=${companyId} no staff/branch/vehicle alerts after filter`);
     return;
   }
 
   stats.companies_processed += 1;
-  stats.processed += counts.staff.total + counts.branch.total;
+  stats.processed += counts.staff.total + counts.branch.total + counts.vehicle.total;
 
   const devices = await fetchActiveDevices(admin, companyId);
   if (!devices.length) {

@@ -7,6 +7,13 @@ import {
   describeNavigationTarget,
   resolveNotificationNavigationTarget,
 } from '@/src/lib/notificationNavigation';
+import { getNavigationAccessRole } from '@/src/lib/navigationAccess';
+import {
+  canViewAlerts,
+  canViewDashboard,
+  canViewDocuments,
+} from '@/src/lib/permissions';
+import { canAccessAppRoute } from '@/src/lib/routePermissions';
 import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { NotificationPayload } from '@/src/types/notifications';
 
@@ -36,16 +43,40 @@ function logPushNavigation(message: string, detail?: unknown): void {
   }
 }
 
+function navigateToSafeHome(): void {
+  const role = getNavigationAccessRole();
+  const screen = canViewDashboard(role) ? 'Dashboard' : 'Settings';
+  navigationRef.dispatch(
+    CommonActions.navigate({
+      name: 'MainTabs',
+      params: { screen },
+    }),
+  );
+}
+
 function dispatchNavigationTarget(
   target: NonNullable<ReturnType<typeof resolveNotificationNavigationTarget>>,
 ): void {
+  const role = getNavigationAccessRole();
+
   if (target.screen === 'DocumentDetail') {
+    if (!canViewDocuments(role) || !canAccessAppRoute(role, 'DocumentDetail')) {
+      logPushNavigation('document route blocked by permissions; opening AccessDenied');
+      navigationRef.dispatch(CommonActions.navigate({ name: 'AccessDenied' }));
+      return;
+    }
     navigationRef.dispatch(
       CommonActions.navigate({
         name: 'DocumentDetail',
         params: { documentId: target.documentId },
       }),
     );
+    return;
+  }
+
+  if (!canViewAlerts(role) || !canAccessAppRoute(role, 'Alerts')) {
+    logPushNavigation('alerts route blocked by permissions; opening safe home');
+    navigateToSafeHome();
     return;
   }
 

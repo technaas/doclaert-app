@@ -26,6 +26,8 @@ type DocumentImagePreviewModalProps = {
   onClose: () => void;
   onError: (message: string) => void;
   onOpenInBrowser: () => void;
+  onDownload?: () => void;
+  downloading?: boolean;
 };
 
 const MIN_SCALE = 1;
@@ -103,6 +105,8 @@ export function DocumentImagePreviewModal({
   onClose,
   onError,
   onOpenInBrowser,
+  onDownload,
+  downloading = false,
 }: DocumentImagePreviewModalProps) {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -143,6 +147,20 @@ export function DocumentImagePreviewModal({
             <Text style={styles.title} numberOfLines={1}>
               {title}
             </Text>
+          ) : null}
+          {onDownload ? (
+            <Pressable
+              style={styles.closeButton}
+              onPress={onDownload}
+              disabled={downloading}
+              accessibilityRole="button"
+              accessibilityLabel="Download document">
+              {downloading ? (
+                <ActivityIndicator color="#F9FAFB" size="small" />
+              ) : (
+                <Ionicons name="download-outline" size={22} color="#F9FAFB" />
+              )}
+            </Pressable>
           ) : null}
         </View>
 

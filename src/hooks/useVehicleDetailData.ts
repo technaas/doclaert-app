@@ -1,18 +1,16 @@
 import { useMemo } from 'react';
 
 import { useVehicleDetailQuery } from '@/src/hooks/queries/useVehicleDetailQuery';
-import { resolveDocumentFileUrl } from '@/src/lib/documentFile';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
 
 export function useVehicleDetailData(
-  companyId: string | undefined,
+  companyId: string | null | undefined,
   vehicleId: string | undefined,
 ) {
   const query = useVehicleDetailQuery(companyId, vehicleId);
   const { isInitialLoading, errorMessage } = getQueryScreenState(query);
 
   const vehicle = query.data?.vehicle ?? null;
-  const thresholdDays = query.data?.alertThresholdDays ?? 30;
 
   const brandName = useMemo(() => {
     if (!vehicle || !query.data) return '—';
@@ -27,14 +25,12 @@ export function useVehicleDetailData(
     return query.data.branches.find((b) => b.id === vehicle.branch_id)?.name ?? '—';
   }, [vehicle, query.data]);
 
-  const daftarFileUrl = resolveDocumentFileUrl(vehicle?.daftar_file_url);
-
   return {
     vehicle,
     brandName,
     branchName,
-    daftarFileUrl,
-    thresholdDays,
+    daftarFileUrl: vehicle?.daftar_file_url ?? null,
+    driverCivilIdFileUrl: vehicle?.driver_civil_id_file_url ?? null,
     loading: isInitialLoading,
     error: companyId ? errorMessage : 'Company not found on your profile.',
     retry: () => query.refetch(),

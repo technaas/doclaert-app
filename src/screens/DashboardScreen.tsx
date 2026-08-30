@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import {
   Pressable,
   RefreshControl,
@@ -19,36 +18,45 @@ import { SummaryCardSkeleton } from '@/src/components/dashboard/SummaryCardSkele
 import { cardStyle, colors, spacing, typography } from '@/src/constants/theme';
 import { useAuth } from '@/src/context/AuthContext';
 import { useDashboardQuery } from '@/src/hooks/queries/useDashboardQuery';
+import {
+  canViewBrand,
+  canViewBranch,
+  canViewDocuments,
+  canViewSalary,
+  canViewStaff,
+  canViewVehicles,
+} from '@/src/lib/permissions';
 import { getQueryScreenState } from '@/src/lib/queryScreenState';
 import { totalBreakdown } from '@/src/types/dashboard';
-import type { AppStackParamList } from '@/src/navigation/AppStack';
 import type { MainTabParamList } from '@/src/navigation/MainTabNavigator';
 
 function formatCount(count: number): string {
   return count.toLocaleString();
 }
 
-type DashboardNavigation = BottomTabNavigationProp<MainTabParamList, 'Dashboard'> &
-  NativeStackNavigationProp<AppStackParamList>;
+type DashboardNavigation = BottomTabNavigationProp<MainTabParamList, 'Dashboard'>;
 
 export function DashboardScreen() {
   const navigation = useNavigation<DashboardNavigation>();
   const { profile } = useAuth();
-  const companyId = profile?.company_id;
+  const companyId = profile?.company_id ?? undefined;
   const query = useDashboardQuery(companyId);
+  const showSalary = canViewSalary(profile?.role);
   const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
   const stats = query.data;
 
-  const openAppScreen = (screen: 'Brands' | 'Branches') => {
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate(screen);
-      return;
-    }
-    navigation.navigate(screen);
+  const openBrands = () => {
+    if (!canViewBrand(profile?.role)) return;
+    navigation.dispatch(CommonActions.navigate({ name: 'Brands' } as never));
+  };
+
+  const openBranches = () => {
+    if (!canViewBranch(profile?.role)) return;
+    navigation.navigate('Branches');
   };
 
   const openStaffActive = () => {
+    if (!canViewStaff(profile?.role)) return;
     navigation.navigate('Staff', {
       screen: 'StaffList',
       params: { status: 'active' },
@@ -56,10 +64,12 @@ export function DashboardScreen() {
   };
 
   const openSalary = () => {
+    if (!showSalary) return;
     navigation.navigate('Salary');
   };
 
-  const openDocuments = (status: 'active' | 'expiring' | 'expired') => {
+  const openDocuments = (status: 'valid' | 'expiring' | 'expired') => {
+    if (!canViewDocuments(profile?.role)) return;
     navigation.navigate('Documents', {
       screen: 'DocumentsList',
       params: { status },
@@ -67,9 +77,13 @@ export function DashboardScreen() {
   };
 
   const openFleet = () => {
-    navigation.navigate('Vehicles', {
-      screen: 'VehiclesList',
-    });
+    if (!canViewVehicles(profile?.role)) return;
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Vehicles',
+        params: { screen: 'VehiclesList' },
+      } as never),
+    );
   };
 
   const error = companyId ? errorMessage : 'Company not found on your profile.';
@@ -94,7 +108,7 @@ export function DashboardScreen() {
   });
 
   return (
-    <AppScreenLayout title={greeting} subtitle={today}>
+    <AppScreenLayout title={greeting} subtitle={today} compactTitle>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -110,13 +124,13 @@ export function DashboardScreen() {
           <>
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Organization</Text>
-              <SummaryCardSkeleton fullWidth />
+              <View style={styles.orgRow}>
+                <SummaryCardSkeleton />
+                <SummaryCardSkeleton />
+              </View>
             </View>
             <View style={styles.section}>
               <PeoplePayrollCardSkeleton />
-            </View>
-            <View style={styles.section}>
-              <SummaryCardSkeleton fullWidth />
             </View>
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Document compliance</Text>
@@ -125,6 +139,9 @@ export function DashboardScreen() {
                   <SummaryCardSkeleton key={index} fullWidth />
                 ))}
               </View>
+            </View>
+            <View style={styles.section}>
+              <SummaryCardSkeleton fullWidth />
             </View>
           </>
         ) : null}
@@ -155,33 +172,33 @@ export function DashboardScreen() {
 
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Organization</Text>
-              <SummaryCard
-                label="Brands & Branches"
-                value={`${formatCount(stats.brandsCount)} / ${formatCount(stats.branchesCount)}`}
-                icon="business-outline"
-                subtitle={`${formatCount(stats.brandsCount)} brands · ${formatCount(stats.branchesCount)} branches`}
-                fullWidth
-                onPress={() => openAppScreen('Brands')}
-              />
+              <View style={styles.orgRow}>
+                <SummaryCard
+                  compact
+                  label="Brands"
+                  value={formatCount(stats.brandsCount)}
+                  icon="briefcase-outline"
+                  subtitle="Company brands"
+                  onPress={canViewBrand(profile?.role) ? openBrands : undefined}
+                />
+                <SummaryCard
+                  compact
+                  label="Branches"
+                  value={formatCount(stats.branchesCount)}
+                  icon="git-branch-outline"
+                  subtitle="Locations"
+                  onPress={canViewBranch(profile?.role) ? openBranches : undefined}
+                />
+              </View>
             </View>
 
             <View style={styles.section}>
               <PeoplePayrollCard
                 activeStaffCount={stats.activeStaffCount}
                 totalPay={stats.totalPay}
-                onPressActiveStaff={openStaffActive}
-                onPressTotalPay={openSalary}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <SummaryCard
-                label="Fleet"
-                value={formatCount(stats.vehiclesCount)}
-                icon="car-outline"
-                subtitle="Vehicles"
-                fullWidth
-                onPress={openFleet}
+                showSalary={showSalary}
+                onPressActiveStaff={canViewStaff(profile?.role) ? openStaffActive : undefined}
+                onPressTotalPay={showSalary ? openSalary : undefined}
               />
             </View>
 
@@ -194,16 +211,18 @@ export function DashboardScreen() {
                   tone="success"
                   breakdown={stats.validDocuments}
                   fullWidth
-                  onPress={() => openDocuments('active')}
+                  onPress={canViewDocuments(profile?.role) ? () => openDocuments('valid') : undefined}
                 />
                 <SummaryCard
                   label="Expiring Soon"
                   icon="time-outline"
                   tone="warning"
                   breakdown={stats.expiringSoon}
-                  subtitle={`Within ${stats.alertThresholdDays} days`}
+                  subtitle="Within 30 days"
                   fullWidth
-                  onPress={() => openDocuments('expiring')}
+                  onPress={
+                    canViewDocuments(profile?.role) ? () => openDocuments('expiring') : undefined
+                  }
                 />
                 <SummaryCard
                   label="Expired"
@@ -212,9 +231,49 @@ export function DashboardScreen() {
                   breakdown={stats.expired}
                   subtitle="Requires immediate attention"
                   fullWidth
-                  onPress={() => openDocuments('expired')}
+                  onPress={
+                    canViewDocuments(profile?.role) ? () => openDocuments('expired') : undefined
+                  }
+                />
+                {totalBreakdown(stats.criticalDocuments) > 0 ? (
+                  <SummaryCard
+                    label="Critical"
+                    icon="alert-circle-outline"
+                    tone="danger"
+                    breakdown={stats.criticalDocuments}
+                    subtitle="Within 7 days"
+                    fullWidth
+                    onPress={
+                      canViewDocuments(profile?.role) ? () => openDocuments('expiring') : undefined
+                    }
+                  />
+                ) : null}
+                <SummaryCard
+                  label="Non-Expiring"
+                  icon="shield-checkmark-outline"
+                  tone="success"
+                  breakdown={stats.nonExpiringDocuments}
+                  fullWidth
+                />
+                <SummaryCard
+                  label="Pending Verification"
+                  icon="hourglass-outline"
+                  tone="warning"
+                  breakdown={stats.pendingVerificationDocuments}
+                  fullWidth
                 />
               </View>
+            </View>
+
+            <View style={styles.section}>
+              <SummaryCard
+                label="Fleet"
+                value={formatCount(stats.vehiclesCount)}
+                icon="car-outline"
+                subtitle="Vehicles"
+                fullWidth
+                onPress={canViewVehicles(profile?.role) ? openFleet : undefined}
+              />
             </View>
           </>
         ) : null}
@@ -231,6 +290,11 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: spacing.lg,
+  },
+  orgRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'stretch',
   },
   sectionLabel: {
     ...typography.label,

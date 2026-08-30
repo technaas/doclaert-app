@@ -3,30 +3,14 @@ import {
   countVehicleDaftarByStatus,
   mergeDocumentCountBreakdowns,
 } from '@/src/lib/documentCounts';
+import type { AccessScope } from '@/src/lib/accessScope';
+import { scopeDocuments, scopeStaffMembers, scopeVehicles } from '@/src/lib/scopeCompanyData';
 import { mapVehicleRecord } from '@/src/lib/vehicleFields';
 import { supabase } from '@/src/lib/supabase';
+import { queryDashboardDocuments } from '@/src/services/documentSelect';
 import type { DashboardStats } from '@/src/types/dashboard';
-
-const DEFAULT_ALERT_THRESHOLD_DAYS = 30;
-
-async function fetchAlertThresholdDays(companyId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from('email_notification_settings')
-    .select('alert_threshold_days')
-    .eq('company_id', companyId)
-    .maybeSingle();
-
-  if (error) {
-    return DEFAULT_ALERT_THRESHOLD_DAYS;
-  }
-
-  const raw = data?.alert_threshold_days;
-  if (typeof raw === 'number' && raw > 0) {
-    return Math.min(365, Math.floor(raw));
-  }
-
-  return DEFAULT_ALERT_THRESHOLD_DAYS;
-}
+import type { DocumentRecord } from '@/src/types/documents';
+import type { StaffMember } from '@/src/types/staff';
 
 async function fetchCompanyName(companyId: string): Promise<string | null> {
   const { data } = await supabase
@@ -39,77 +23,76 @@ async function fetchCompanyName(companyId: string): Promise<string | null> {
   return name || null;
 }
 
-export async function fetchDashboardStats(companyId: string): Promise<DashboardStats> {
-  const [
-    alertThresholdDays,
-    companyName,
-    brandsResult,
-    branchesResult,
-    staffResult,
-    documentsResult,
-    vehiclesResult,
-  ] = await Promise.all([
-    fetchAlertThresholdDays(companyId),
-    fetchCompanyName(companyId),
-    supabase
-      .from('brands')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', companyId),
-    supabase
-      .from('branches')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', companyId),
-    supabase
-      .from('staff')
-      .select('salary')
-      .eq('company_id', companyId)
-      .eq('status', 'active'),
-    supabase
-      .from('documents')
-      .select('expiry_date, type')
-      .eq('company_id', companyId)
-      .not('expiry_date', 'is', null),
-    supabase.from('vehicles').select('*').eq('company_id', companyId),
-  ]);
+export async function fetchDashboardStats(
+  companyId: string,
+  options: { scope: AccessScope; includeSalary: boolean },
+): Promise<DashboardStats> {
+  const staffQuery = options.includeSalary
+    ? supabase
+        .from('staff')
+        .select('id, brand_id, branch_id, status, salary')
+        .eq('company_id', companyId)
+        .eq('status', 'active')
+    : supabase
+        .from('staff')
+        .select('id, brand_id, branch_id, status')
+        .eq('company_id', companyId)
+        .eq('status', 'active');
 
-  if (brandsResult.error) {
-    throw new Error(brandsResult.error.message);
-  }
-  if (branchesResult.error) {
-    throw new Error(branchesResult.error.message);
-  }
-  if (staffResult.error) {
-    throw new Error(staffResult.error.message);
-  }
-  if (documentsResult.error) {
-    throw new Error(documentsResult.error.message);
-  }
+  const [companyName, brandsResult, branchesResult, staffResult, documentsResult, vehiclesResult] =
+    await Promise.all([
+      fetchCompanyName(companyId),
+      supabase.from('brands').select('id').eq('company_id', companyId),
+      supabase.from('branches').select('id, brand_id').eq('company_id', companyId),
+      staffQuery,
+      queryDashboardDocuments(companyId),
+      supabase.from('vehicles').select('*').eq('company_id', companyId),
+    ]);
+
+  if (brandsResult.error) throw new Error(brandsResult.error.message);
+  if (branchesResult.error) throw new Error(branchesResult.error.message);
+  if (staffResult.error) throw new Error(staffResult.error.message);
+  if (documentsResult.error) throw new Error(documentsResult.error.message);
+
   const vehicleRows = vehiclesResult.error ? [] : (vehiclesResult.data ?? []);
-
-  const activeStaff = staffResult.data ?? [];
-  const totalPay = activeStaff.reduce(
-    (sum, row) => sum + (typeof row.salary === 'number' ? row.salary : 0),
-    0,
+  const brands = options.scope.filterBrands(brandsResult.data ?? []);
+  const branches = options.scope.filterBranches(branchesResult.data ?? []);
+  const staff = scopeStaffMembers(
+    ((staffResult.data ?? []) as unknown as StaffMember[]),
+    options.scope,
+  );
+  const documents = scopeDocuments(
+    (documentsResult.data ?? []) as DocumentRecord[],
+    options.scope,
+    staff,
+    branches,
+  );
+  const vehicles = scopeVehicles(
+    vehicleRows.map((row) => mapVehicleRecord(row as Record<string, unknown>)),
+    options.scope,
   );
 
+  const totalPay = options.includeSalary
+    ? staff.reduce((sum, row) => sum + (typeof row.salary === 'number' ? row.salary : 0), 0)
+    : 0;
+
   const documentCounts = mergeDocumentCountBreakdowns(
-    countDocumentsByStatus(documentsResult.data ?? [], alertThresholdDays),
-    countVehicleDaftarByStatus(
-      vehicleRows.map((row) => mapVehicleRecord(row as Record<string, unknown>)),
-      alertThresholdDays,
-    ),
+    countDocumentsByStatus(documents),
+    countVehicleDaftarByStatus(vehicles),
   );
 
   return {
-    brandsCount: brandsResult.count ?? 0,
-    branchesCount: branchesResult.count ?? 0,
-    activeStaffCount: activeStaff.length,
+    brandsCount: brands.length,
+    branchesCount: branches.length,
+    activeStaffCount: staff.length,
     totalPay,
-    vehiclesCount: vehicleRows.length,
+    vehiclesCount: vehicles.length,
     validDocuments: documentCounts.valid,
     expiringSoon: documentCounts.expiringSoon,
     expired: documentCounts.expired,
+    criticalDocuments: documentCounts.critical,
+    nonExpiringDocuments: documentCounts.nonExpiring,
+    pendingVerificationDocuments: documentCounts.pendingVerification,
     companyName,
-    alertThresholdDays,
   };
 }

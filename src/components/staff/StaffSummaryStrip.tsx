@@ -1,5 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { colors } from '@/src/constants/theme';
+
 type StaffSummaryStripProps = {
   total: number;
   active: number;
@@ -13,10 +15,10 @@ const TONE_STYLES: Record<
   { bg: string; border: string; label: string; value: string }
 > = {
   neutral: {
-    bg: '#EFF6FF',
-    border: '#BFDBFE',
-    label: '#2563EB',
-    value: '#111827',
+    bg: colors.primaryLight,
+    border: colors.primaryMuted,
+    label: colors.primary,
+    value: colors.text,
   },
   success: {
     bg: '#ECFDF5',

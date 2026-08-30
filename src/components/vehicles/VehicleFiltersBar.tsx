@@ -6,9 +6,11 @@ import type { Branch, Brand } from '@/src/types/staff';
 
 const STATUS_OPTIONS: FilterOption[] = [
   { value: 'all', label: 'All statuses' },
-  { value: 'active', label: 'Valid' },
+  { value: 'valid', label: 'Valid' },
   { value: 'expiring', label: 'Expiring Soon' },
+  { value: 'critical', label: 'Critical' },
   { value: 'expired', label: 'Expired' },
+  { value: 'pending_verification', label: 'Pending Verification' },
 ];
 
 type VehicleFiltersBarProps = {

@@ -2,7 +2,13 @@ export type DocumentKind = 'staff' | 'branch' | 'vehicle';
 
 export type DocumentTab = 'all' | 'staff' | 'branch' | 'vehicle';
 
-export type DocumentDisplayStatus = 'active' | 'expiring' | 'expired';
+export type DocumentDisplayStatus =
+  | 'valid'
+  | 'expiring'
+  | 'critical'
+  | 'expired'
+  | 'non_expiring'
+  | 'pending_verification';
 
 export type DocumentRecord = {
   id: string;
@@ -11,6 +17,7 @@ export type DocumentRecord = {
   branch_id: string | null;
   document_name: string;
   expiry_date: string | null;
+  expiry_status: string | null;
   file_url: string | null;
   status: string | null;
   notes: string | null;

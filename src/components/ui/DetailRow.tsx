@@ -1,37 +1,50 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing } from '@/src/constants/theme';
+import { colors, spacing, typography } from '@/src/constants/theme';
 
 type DetailRowProps = {
   label: string;
-  value: string;
+  value?: string | null;
+  children?: ReactNode;
 };
 
-export function DetailRow({ label, value }: DetailRowProps) {
+export function DetailRow({ label, value, children }: DetailRowProps) {
+  const display = (value ?? '').trim() || '—';
+
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value || '—'}</Text>
+      {children ? (
+        <View style={styles.valueWrap}>{children}</View>
+      ) : (
+        <Text style={styles.value}>{display}</Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
+    gap: spacing.md,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    ...typography.label,
+    width: 132,
+    paddingTop: 2,
+  },
+  valueWrap: {
+    flex: 1,
+    alignItems: 'flex-start',
   },
   value: {
-    fontSize: 15,
-    color: colors.text,
+    ...typography.body,
+    flex: 1,
+    fontWeight: '600',
   },
 });

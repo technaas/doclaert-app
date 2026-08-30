@@ -2,10 +2,7 @@ import { memo } from 'react';
 
 import { ExpiryFooter } from '@/src/components/ui/ExpiryFooter';
 import { ListCard } from '@/src/components/ui/ListCard';
-import {
-  DOCUMENT_STATUS_LABEL,
-  statusBadgeTone,
-} from '@/src/lib/documentStatus';
+import { listCardTone, DOCUMENT_STATUS_LABEL, statusBadgeTone } from '@/src/lib/documentStatus';
 import type { DocumentListItem } from '@/src/types/documents';
 
 type DocumentCardProps = {
@@ -15,12 +12,7 @@ type DocumentCardProps = {
 
 function DocumentCardComponent({ document, onPress }: DocumentCardProps) {
   const badgeTone = statusBadgeTone(document.displayStatus);
-  const cardTone =
-    document.displayStatus === 'expired'
-      ? 'danger'
-      : document.displayStatus === 'expiring'
-        ? 'warning'
-        : 'default';
+  const cardTone = listCardTone(document.displayStatus);
 
   const subtitle =
     document.kind === 'vehicle'

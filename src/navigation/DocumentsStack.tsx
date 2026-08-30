@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { colors } from '@/src/constants/theme';
 import { DocumentDetailScreen } from '@/src/screens/documents/DocumentDetailScreen';
 import { DocumentsScreen } from '@/src/screens/documents/DocumentsScreen';
 
@@ -29,7 +30,7 @@ export function DocumentsStack() {
         options={{
           presentation: 'modal',
           title: 'Document Details',
-          headerTintColor: '#2563EB',
+          headerTintColor: colors.primary,
         }}
       />
     </Stack.Navigator>

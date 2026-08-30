@@ -13,8 +13,10 @@ export type DashboardStats = {
   validDocuments: DocumentCountBreakdown;
   expiringSoon: DocumentCountBreakdown;
   expired: DocumentCountBreakdown;
+  criticalDocuments: DocumentCountBreakdown;
+  nonExpiringDocuments: DocumentCountBreakdown;
+  pendingVerificationDocuments: DocumentCountBreakdown;
   companyName: string | null;
-  alertThresholdDays: number;
 };
 
 export function totalBreakdown(breakdown: DocumentCountBreakdown): number {

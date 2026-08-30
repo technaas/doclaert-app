@@ -9,7 +9,7 @@ const EMPTY_VEHICLES: VehicleRecord[] = [];
 const EMPTY_BRANDS: Brand[] = [];
 const EMPTY_BRANCHES: Branch[] = [];
 
-export function useCompanyVehiclesData(companyId: string | undefined) {
+export function useCompanyVehiclesData(companyId: string | null | undefined) {
   const query = useCompanyVehiclesQuery(companyId);
   const { isInitialLoading, isRefreshing, errorMessage } = getQueryScreenState(query);
   const data = query.data;

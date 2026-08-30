@@ -2,6 +2,16 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4
 import type { MobileDeviceRow, NotificationCategory } from "./types.ts";
 
 /**
+ * mobile_notification_logs.check currently allows staff | branch | test.
+ * Vehicle Daftar pushes are logged as branch until that constraint is widened.
+ */
+function logTypeForCategory(category: NotificationCategory): "staff" | "branch" | "test" {
+  if (category === "vehicle") return "branch";
+  if (category === "test") return "test";
+  return category;
+}
+
+/**
  * Returns true when a successful push of this category was sent fewer than
  * repeat_interval_days ago — cron should skip until the interval elapses.
  * First alert in a new window has no prior log and is always allowed.
@@ -18,7 +28,7 @@ export async function wasSentWithinRepeatInterval(
     .select("sent_at")
     .eq("company_id", companyId)
     .eq("mobile_device_id", deviceId)
-    .eq("notification_type", category)
+    .eq("notification_type", logTypeForCategory(category))
     .eq("status", "sent")
     .order("sent_at", { ascending: false })
     .limit(1)
@@ -48,7 +58,7 @@ export async function insertNotificationLog(
     company_id: params.companyId,
     user_id: params.userId,
     mobile_device_id: params.device.id,
-    notification_type: params.category,
+    notification_type: logTypeForCategory(params.category),
     status: params.status,
     device_name: params.device.device_name,
     platform: params.device.platform,

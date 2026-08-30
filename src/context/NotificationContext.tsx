@@ -8,9 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type * as Notifications from 'expo-notifications';
 
 import { useAuth } from '@/src/context/AuthContext';
+import {
+  isPushRuntimeSupported,
+  PUSH_USER_SYNC_FAILED,
+  PUSH_USER_UNAVAILABLE,
+} from '@/src/lib/pushAvailability';
 import {
   configureNotifications,
   getDeviceRegistrationInfo,
@@ -86,17 +90,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const registrationInFlight = useRef(false);
   const activeUserIdRef = useRef<string | null>(null);
 
-  const handleNotificationOpened = useCallback(
-    (response: Notifications.NotificationResponse) => {
-      const payload = parseNotificationPayload(
-        response.notification.request.content.data as Record<string, unknown>,
-      );
-      navigateFromNotification(payload, {
-        notificationId: response.notification.request.identifier,
-      });
-    },
-    [],
-  );
+  const handleNotificationOpened = useCallback((response: unknown) => {
+    const data = (
+      response as {
+        notification?: { request?: { content?: { data?: Record<string, unknown> }; identifier?: string } };
+      }
+    )?.notification?.request;
+    const payload = parseNotificationPayload(
+      (data?.content?.data ?? {}) as Record<string, unknown>,
+    );
+    navigateFromNotification(payload, {
+      notificationId: data?.identifier,
+    });
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -139,7 +145,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         setPermissionMessage(PERMISSION_DENIED_MESSAGE);
         setExpoPushToken(null);
       } else if (status === 'unavailable') {
-        setPermissionMessage('Push notifications are not available on this device.');
+        setPermissionMessage(PUSH_USER_UNAVAILABLE);
         setExpoPushToken(null);
       } else {
         setPermissionMessage(null);
@@ -148,9 +154,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return status;
     } catch (error) {
       pushLog('Permission status check failed', error);
-      console.error('[DocAlert push] Permission status check failed', error);
       setPermissionStatus('unavailable');
-      setPermissionMessage('Unable to check notification permission.');
+      setPermissionMessage(PUSH_USER_UNAVAILABLE);
       return 'unavailable' as NotificationPermissionStatus;
     }
   }, []);
@@ -167,6 +172,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         user_id: user?.id ?? null,
         company_id: profile?.company_id ?? null,
       });
+      return;
+    }
+
+    if (!isPushRuntimeSupported()) {
+      pushLog('registerDevice skipped — push runtime unsupported');
+      setPermissionStatus('unavailable');
+      setPermissionMessage(PUSH_USER_UNAVAILABLE);
+      setSyncStatus('idle');
+      setLastSyncError(null);
       return;
     }
 
@@ -199,17 +213,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         pushLog('Registration stopped — permission denied');
         setPermissionMessage(PERMISSION_DENIED_MESSAGE);
         setExpoPushToken(null);
-        setSyncStatus('error');
-        setLastSyncError('Notification permission denied.');
+        setSyncStatus('idle');
+        setLastSyncError(null);
+        return;
+      }
+
+      if (status === 'unavailable') {
+        pushLog('Registration stopped — push unavailable');
+        setPermissionMessage(PUSH_USER_UNAVAILABLE);
+        setExpoPushToken(null);
+        setSyncStatus('idle');
+        setLastSyncError(null);
         return;
       }
 
       if (status !== 'granted') {
-        const msg = `Notification permission not granted (status: ${status}).`;
         pushLog('Registration stopped — permission not granted', { status });
-        setSyncStatus('error');
-        setLastSyncError(msg);
-        setPermissionMessage(msg);
+        setSyncStatus('idle');
+        setLastSyncError(null);
+        setPermissionMessage(PERMISSION_DENIED_MESSAGE);
         return;
       }
 
@@ -247,13 +269,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       pushLog('Registration complete — mobile_devices synced');
       startupLog('Device registration complete');
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to register device for push.';
-      pushLog('Registration failed', { message, err });
-      console.error('[DocAlert push] Registration failed', err);
+      pushLog('Registration failed', err);
       startupLog('Device registration failed (non-blocking)', err);
       setSyncStatus('error');
-      setLastSyncError(message);
+      setLastSyncError(PUSH_USER_SYNC_FAILED);
+      setPermissionMessage(PUSH_USER_SYNC_FAILED);
     } finally {
       registrationInFlight.current = false;
       setIsRegistering(false);
@@ -267,9 +287,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user?.id || !profile?.company_id) {
       const result: PushRegistrationTestResult = {
         success: false,
-        message: 'Not logged in or profile missing company_id.',
+        message: 'Sign in to test push alerts.',
       };
       pushLog('Test aborted', result);
+      return result;
+    }
+
+    if (!isPushRuntimeSupported()) {
+      const result: PushRegistrationTestResult = {
+        success: false,
+        message: PUSH_USER_UNAVAILABLE,
+      };
+      pushLog('Test aborted — push runtime unsupported', result);
       return result;
     }
 
@@ -291,22 +320,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         setPermissionStatus(result.permissionStatus ?? 'granted');
       } else {
         setSyncStatus('error');
-        setLastSyncError(result.message);
+        setLastSyncError(PUSH_USER_SYNC_FAILED);
       }
 
       pushLog('=== TEST PUSH REGISTRATION RESULT ===', result);
-      return result;
+      return {
+        ...result,
+        message: result.success ? 'Push alerts are set up on this device.' : PUSH_USER_SYNC_FAILED,
+        error: undefined,
+        supabaseResponse: undefined,
+      };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      pushLog('=== TEST PUSH REGISTRATION FAILED ===', err);
       const result: PushRegistrationTestResult = {
         success: false,
-        message,
-        error: message,
+        message: PUSH_USER_SYNC_FAILED,
       };
-      pushLog('=== TEST PUSH REGISTRATION FAILED ===', result);
-      console.error('[DocAlert push] Test registration failed', err);
       setSyncStatus('error');
-      setLastSyncError(message);
+      setLastSyncError(PUSH_USER_SYNC_FAILED);
       return result;
     } finally {
       setIsRegistering(false);
@@ -328,6 +359,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [registerDevice]);
 
   useEffect(() => {
+    if (!isPushRuntimeSupported()) {
+      setPermissionStatus('unavailable');
+      setPermissionMessage(PUSH_USER_UNAVAILABLE);
+      setSyncStatus('idle');
+      return;
+    }
+
     if (!session?.user?.id || !profile?.company_id) {
       pushLog('Auto-register skipped — no session or company_id yet', {
         sessionUserId: session?.user?.id ?? null,
@@ -351,7 +389,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           pushLog('Auto-register finished');
         } catch (error) {
           pushLog('Deferred notification registration failed', error);
-          console.error('[DocAlert push] Deferred registration failed', error);
           startupLog('Deferred notification registration failed', error);
         }
       })();

@@ -22,7 +22,14 @@ import {
   startupLog,
   withTimeout,
 } from '@/src/lib/startup';
-import type { Profile } from '@/types';
+import {
+  ACCOUNT_DISABLED_MESSAGE,
+  PROFILE_MISSING_MESSAGE,
+  type Profile,
+} from '@/src/types/auth';
+import { setRuntimeRolePermissions } from '@/src/lib/permissions';
+import { setNavigationAccessRole } from '@/src/lib/navigationAccess';
+import { loadRuntimeRolePermissions } from '@/src/services/rolePermissions';
 
 type AuthContextValue = {
   session: Session | null;
@@ -37,22 +44,45 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function mapProfile(row: Record<string, unknown>): Profile {
+  return {
+    id: String(row.id),
+    company_id: (row.company_id as string | null) ?? null,
+    role: (row.role as string | null) ?? null,
+    name: (row.name as string | null) ?? null,
+    email: (row.email as string | null) ?? null,
+    is_active: (row.is_active as boolean | null) ?? null,
+    must_change_password: (row.must_change_password as boolean | null) ?? null,
+    access_all_brands: (row.access_all_brands as boolean | null) ?? null,
+    access_all_branches: (row.access_all_branches as boolean | null) ?? null,
+    assigned_branch_id: (row.assigned_branch_id as string | null) ?? null,
+  };
+}
+
 async function fetchProfile(userId: string): Promise<Profile> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, company_id, role')
+    .select(
+      'id, company_id, role, is_active, must_change_password, access_all_brands, access_all_branches, assigned_branch_id, name, email',
+    )
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
   }
 
   if (!data) {
-    throw new Error('Profile not found');
+    throw new Error(PROFILE_MISSING_MESSAGE);
   }
 
-  return data as Profile;
+  const profile = mapProfile(data as Record<string, unknown>);
+  if (profile.is_active === false) {
+    await supabase.auth.signOut();
+    throw new Error(ACCOUNT_DISABLED_MESSAGE);
+  }
+
+  return profile;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -74,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUser(null);
     setProfile(null);
+    setNavigationAccessRole(null);
   }, []);
 
   const clearSessionNotice = useCallback(() => {
@@ -132,6 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signedOutHandledRef.current = true;
       setSession(null);
       clearAuthState();
+      setRuntimeRolePermissions(null);
+      setNavigationAccessRole(null);
 
       if (options.showSessionExpired) {
         setSessionExpiredNoticeOnce();
@@ -146,6 +179,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadUserProfile = useCallback(async (authUser: User) => {
     startupLog('Loading user profile', { userId: authUser.id });
     const profileData = await fetchProfile(authUser.id);
+    await loadRuntimeRolePermissions(profileData.company_id);
+    setNavigationAccessRole(profileData.role);
     setProfile(profileData);
     setUser(authUser);
     startupLog('Profile loaded');
@@ -231,6 +266,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (await handleAuthErrorRef.current(profileError)) {
               return;
             }
+            const message =
+              profileError instanceof Error ? profileError.message : String(profileError);
+            if (message === ACCOUNT_DISABLED_MESSAGE) {
+              applySignedOutStateRef.current({ showSessionExpired: false });
+              setSessionNotice(ACCOUNT_DISABLED_MESSAGE);
+              return;
+            }
             startupLog('Profile load failed on startup (continuing)', profileError);
             setUser(currentSession.user);
             setProfile(null);
@@ -295,6 +337,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (!nextSession?.user) {
+        return;
+      }
+
       startupLog('Auth state change', { event, hasSession: true });
 
       applySignedInSessionRef.current(nextSession);
@@ -303,6 +349,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const authUser = nextSession.user;
+
       setTimeout(() => {
         if (!mounted || recoveringRef.current) {
           return;
@@ -310,13 +358,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         void (async () => {
           try {
-            await loadUserProfileRef.current(nextSession.user);
+            await loadUserProfileRef.current(authUser);
           } catch (profileError) {
             if (await handleAuthErrorRef.current(profileError)) {
               return;
             }
+            const message =
+              profileError instanceof Error ? profileError.message : String(profileError);
+            if (message === ACCOUNT_DISABLED_MESSAGE) {
+              applySignedOutStateRef.current({ showSessionExpired: false });
+              setSessionNotice(ACCOUNT_DISABLED_MESSAGE);
+              return;
+            }
             startupLog('Profile load failed on auth event', profileError);
-            setUser(nextSession.user);
+            setUser(authUser);
             setProfile(null);
           }
         })();
