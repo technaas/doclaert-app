@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import type { Administrator } from "./auth.ts";
 import { sendExpoPushRaw } from "./expo.ts";
 import { insertNotificationLog } from "./logs.ts";
+import { redactSecrets } from "./redact.ts";
 import type { ExpoPushMessage, MobileDeviceRow } from "./types.ts";
 
 export const TEST_PUSH = {
@@ -15,114 +17,80 @@ function isValidExpoToken(token: string | null | undefined): token is string {
     token.startsWith("ExpoPushToken[");
 }
 
-export interface TestModeResult {
+export interface DeviceTestResult {
   mode: "test";
   success: boolean;
+  httpStatus: number;
   device: {
     id: string;
     company_id: string;
-    user_id: string;
     device_name: string | null;
     platform: string | null;
   } | null;
-  expo_push_token: string | null;
-  expo_response: unknown;
   error?: string;
 }
 
-export async function runTestMode(
+function denied(message: string, httpStatus = 403): DeviceTestResult {
+  return { mode: "test", success: false, httpStatus, device: null, error: message };
+}
+
+export async function runDeviceTest(
   admin: SupabaseClient,
-  filterCompanyId: string | null,
-): Promise<TestModeResult> {
-  let deviceQ = admin
+  administrator: Administrator,
+  deviceId: string,
+  requestedCompanyId: string | null,
+): Promise<DeviceTestResult> {
+  const { data, error } = await admin
     .from("mobile_devices")
     .select(
       "id, company_id, user_id, expo_push_token, device_name, platform, is_active",
     )
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(50);
+    .eq("id", deviceId)
+    .maybeSingle();
 
-  if (filterCompanyId) {
-    deviceQ = deviceQ.eq("company_id", filterCompanyId);
+  if (error) return denied("The selected device could not be loaded.", 500);
+  const device = data as MobileDeviceRow | null;
+  if (!device) return denied("The selected device was not found.", 404);
+
+  if (requestedCompanyId && requestedCompanyId !== device.company_id) {
+    return denied("The selected device is not in the requested company.");
   }
 
-  const { data: rows, error: devErr } = await deviceQ;
-  if (devErr) {
-    const result: TestModeResult = {
-      mode: "test",
-      success: false,
-      device: null,
-      expo_push_token: null,
-      expo_response: null,
-      error: devErr.message,
-    };
-    console.log("[mobile-expiry:test]", JSON.stringify(result, null, 2));
-    return result;
+  const sameCompany = administrator.companyId === device.company_id;
+  if (administrator.role === "owner" && !sameCompany) {
+    return denied("You can test only a device in your company.");
+  }
+  if (administrator.role === "technaas_super_admin" && !sameCompany && !requestedCompanyId) {
+    return denied("Confirm the company before testing a device outside your company.");
   }
 
-  const device = (rows ?? []).find((r) =>
-    isValidExpoToken((r as MobileDeviceRow).expo_push_token)
-  ) as MobileDeviceRow | undefined;
-
-  if (!device) {
-    const result: TestModeResult = {
-      mode: "test",
-      success: false,
-      device: null,
-      expo_push_token: null,
-      expo_response: null,
-      error: filterCompanyId
-        ? "No active device with a valid Expo push token for this company"
-        : "No active device with a valid Expo push token found",
-    };
-    console.log("[mobile-expiry:test]", JSON.stringify(result, null, 2));
-    return result;
+  if (!device.is_active) return denied("That device is not active.");
+  if (!isValidExpoToken(device.expo_push_token)) {
+    return denied("That device does not have a usable Expo push token.");
   }
 
-  const token = device.expo_push_token!;
   const message: ExpoPushMessage = {
-    to: token,
+    to: device.expo_push_token,
     title: TEST_PUSH.title,
     body: TEST_PUSH.body,
     data: { ...TEST_PUSH.data },
   };
 
-  console.log("[mobile-expiry:test] selected device:", {
-    id: device.id,
-    company_id: device.company_id,
-    user_id: device.user_id,
-    device_name: device.device_name,
-    platform: device.platform,
-  });
-  console.log("[mobile-expiry:test] expo_push_token:", token);
-
-  let expoResponse: unknown;
   let success = false;
-  let error: string | undefined;
+  let failure: string | undefined;
   let ticketId: string | undefined;
 
   try {
     const raw = await sendExpoPushRaw([message]);
-    expoResponse = raw;
-    console.log(
-      "[mobile-expiry:test] Expo API response:",
-      JSON.stringify(raw, null, 2),
-    );
-
     const ticket = raw.tickets[0];
     if (raw.httpOk && ticket?.ok) {
       success = true;
       ticketId = ticket.ticketId;
-      console.log("[mobile-expiry:test] success");
     } else {
-      error = ticket?.error ?? raw.httpError ?? "Expo push failed";
-      console.log("[mobile-expiry:test] failure:", error);
+      failure = redactSecrets(ticket?.error ?? raw.httpError ?? "Expo push failed");
     }
   } catch (e) {
-    error = (e as Error).message;
-    expoResponse = { error };
-    console.log("[mobile-expiry:test] failure:", error);
+    failure = redactSecrets((e as Error).message);
   }
 
   try {
@@ -132,31 +100,30 @@ export async function runTestMode(
       device,
       category: "test",
       status: success ? "sent" : "failed",
-      error,
+      error: failure,
       expoTicketId: ticketId,
     });
   } catch (logErr) {
-    console.log(
-      "[mobile-expiry:test] log insert failed:",
-      (logErr as Error).message,
-    );
+    console.log("[mobile-expiry:test] log insert failed:", redactSecrets((logErr as Error).message));
   }
 
-  const result: TestModeResult = {
+  console.log("[mobile-expiry:test]", {
+    success,
+    device_id: device.id,
+    company_id: device.company_id,
+    administrator_id: administrator.userId,
+  });
+
+  return {
     mode: "test",
     success,
+    httpStatus: success ? 200 : 502,
     device: {
       id: device.id,
       company_id: device.company_id,
-      user_id: device.user_id,
       device_name: device.device_name,
       platform: device.platform,
     },
-    expo_push_token: token,
-    expo_response: expoResponse,
-    ...(error ? { error } : {}),
+    ...(failure ? { error: failure } : {}),
   };
-
-  console.log("[mobile-expiry:test] result:", JSON.stringify(result, null, 2));
-  return result;
 }

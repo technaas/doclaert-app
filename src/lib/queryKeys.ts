@@ -1,8 +1,3 @@
-import type {
-  MobileNotificationLogStatusFilter,
-  MobileNotificationLogTypeFilter,
-} from '@/src/types/mobileNotificationLogs';
-
 export const queryKeys = {
   companyName: (companyId: string) => ['company', companyId, 'name'] as const,
   companyProfile: (companyId: string) => ['company', companyId, 'profile'] as const,
@@ -24,11 +19,6 @@ export const queryKeys = {
     ['company', companyId, 'document', documentId] as const,
   vehicle: (companyId: string, vehicleId: string, scopeKey = '') =>
     ['company', companyId, 'vehicle', vehicleId, scopeKey] as const,
-  notificationLogs: (
-    companyId: string,
-    statusFilter: MobileNotificationLogStatusFilter,
-    typeFilter: MobileNotificationLogTypeFilter,
-  ) => ['company', companyId, 'notificationLogs', statusFilter, typeFilter] as const,
   subscription: (companyId: string) => ['company', companyId, 'subscription'] as const,
   documentTypes: (companyId: string) => ['company', companyId, 'documentTypes'] as const,
   accessMappings: (userId: string) => ['profile', userId, 'accessMappings'] as const,

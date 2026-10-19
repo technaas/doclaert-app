@@ -4,6 +4,7 @@ import { DocumentTypesProvider } from '@/src/context/DocumentTypesContext';
 import { NotificationProvider } from '@/src/context/NotificationContext';
 import { useSubscriptionGate } from '@/src/hooks/useSubscriptionGate';
 import { requiresPasswordChange } from '@/src/lib/passwordChangeGate';
+import { formatSubscriptionEnd } from '@/src/lib/subscription';
 import { startupLog } from '@/src/lib/startup';
 import { AccessGateScreen } from '@/src/screens/access/AccessGateScreen';
 
@@ -72,12 +73,18 @@ export function RootNavigator({ authTimedOut = false }: RootNavigatorProps) {
   }
 
   if (!subscription.allowed) {
-    const endDate = subscription.subscription?.end_date;
+    const endLabel = formatSubscriptionEnd(subscription.subscription);
+    const detail =
+      endLabel === '—'
+        ? null
+        : endLabel === 'Lifetime'
+          ? 'Software license: Lifetime'
+          : `End date: ${endLabel}`;
     return (
       <AccessGateScreen
         title="Subscription Inactive"
         message="Your subscription is not active. Please contact Technaas support to renew your access."
-        detail={endDate ? `End date: ${endDate}` : null}
+        detail={detail}
         icon="card-outline"
       />
     );

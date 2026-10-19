@@ -1,75 +1,59 @@
--- =============================================================================
--- DocAlert: ONE daily cron for mobile expiry push notifications
--- =============================================================================
+-- DocAlert mobile expiry push — prepared daily job.
 --
--- IMPORTANT
--- - Create exactly ONE schedule for send-mobile-expiry-notifications.
--- - Do NOT create separate cron jobs per company.
--- - The Edge Function loops every row in email_notification_settings itself.
+-- Do not execute this file yet.
+-- Production still runs send-mobile-expiry-notifications version 18, which
+-- checks CRON_SECRET. Creating this job before the MOBILE_CRON_SECRET
+-- function version is deployed would call the function with a secret it
+-- does not accept.
 --
--- Schedule: every day at 08:00 Asia/Kuwait (UTC+3, no DST)
--- pg_cron uses UTC: 08:00 Kuwait = 05:00 UTC → cron expression: 0 5 * * *
+-- Rollout order:
+--   1. Generate one 32-byte random value outside Git and do not print it.
+--   2. Store that same value as Edge Function secret MOBILE_CRON_SECRET
+--      and as Vault secret MOBILE_CRON_SECRET.
+--   3. Leave CRON_SECRET unchanged.
+--   4. Deploy only send-mobile-expiry-notifications with --no-verify-jwt.
+--   5. Then run the schedule statement below once.
 --
--- Prerequisites (Supabase Dashboard → Database → Extensions):
---   - pg_cron
---   - pg_net
---
--- Replace placeholders before running:
---   YOUR_PROJECT_REF  → Project Settings → General → Reference ID
---   YOUR_SERVICE_ROLE_KEY → Project Settings → API → service_role (secret)
---
--- =============================================================================
+-- The schedule is 07:00 UTC, which is 10:00 Asia/Kuwait.
+-- Body {} processes every eligible company. The function keeps company
+-- isolation, permissions, thresholds, and reminder intervals.
+-- Do not send the service-role key.
 
--- 1) List existing cron jobs (avoid duplicates)
-select jobid, jobname, schedule, command
-from cron.job
-order by jobname;
+-- select cron.schedule(
+--   'send-mobile-expiry-notifications-daily',
+--   '0 7 * * *',
+--   $$
+--   select net.http_post(
+--     url := 'https://bskqksmqhdepgxyzsqmq.supabase.co/functions/v1/send-mobile-expiry-notifications',
+--     body := '{}'::jsonb,
+--     params := '{}'::jsonb,
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'x-cron-secret', (
+--         select decrypted_secret
+--         from vault.decrypted_secrets
+--         where name = 'MOBILE_CRON_SECRET'
+--       )
+--     ),
+--     timeout_milliseconds := 120000
+--   );
+--   $$
+-- );
 
--- 2) Remove old/duplicate mobile push jobs if you re-run this script
-select cron.unschedule(jobid)
-from cron.job
-where jobname in (
-  'send-mobile-expiry-notifications-daily',
-  'mobile-expiry-push-daily-kuwait-8am'
-);
+-- Presence, without secret values:
+-- select name from vault.secrets where name = 'MOBILE_CRON_SECRET';
+-- select jobid, jobname, schedule, active
+-- from cron.job
+-- where jobname = 'send-mobile-expiry-notifications-daily';
 
--- 3) Schedule ONE daily job at 08:00 Kuwait (05:00 UTC)
-select cron.schedule(
-  'send-mobile-expiry-notifications-daily',
-  '0 5 * * *',
-  $$
-  select net.http_post(
-    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-mobile-expiry-notifications',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY'
-    ),
-    body := '{}'::jsonb
-  ) as request_id;
-  $$
-);
-
--- 4) Verify the job exists (expect exactly one row for this job name)
-select jobid, jobname, schedule, active
-from cron.job
-where jobname = 'send-mobile-expiry-notifications-daily';
-
--- =============================================================================
--- Alternative: Supabase Dashboard (no SQL)
--- =============================================================================
--- Edge Functions → send-mobile-expiry-notifications → Cron Jobs → Add
---   Schedule: 0 5 * * *   (05:00 UTC = 08:00 Kuwait)
---   HTTP method: POST
---   Body: {}
---   Authorization: Bearer <service_role_key>
---
--- Again: one cron total, not per company.
--- =============================================================================
---
--- Manual test (does not use production expiry logic):
---   POST .../send-mobile-expiry-notifications?test=true
---
--- Manual production run for one company:
---   POST .../send-mobile-expiry-notifications
---   Body: { "company_id": "<uuid>" }
--- =============================================================================
+-- History, without command text:
+-- select d.status, d.start_time, d.end_time
+-- from cron.job_run_details d
+-- join cron.job j on j.jobid = d.jobid
+-- where j.jobname = 'send-mobile-expiry-notifications-daily'
+-- order by d.start_time desc
+-- limit 20;
+-- select id, status_code, timed_out, created
+-- from net._http_response
+-- order by created desc
+-- limit 20;

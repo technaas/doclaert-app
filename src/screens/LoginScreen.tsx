@@ -1,3 +1,5 @@
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,8 +18,10 @@ import { DocAlertLogo } from '@/src/components/branding/DocAlertLogo';
 import { useAuth } from '@/src/context/AuthContext';
 import { getErrorMessage } from '@/src/lib/errors';
 import { cardStyle, colors, radius, shadows, spacing, typography } from '@/src/constants/theme';
+import type { AuthStackParamList } from '@/src/navigation/AuthStack';
 
 export function LoginScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { login, sessionNotice, clearSessionNotice } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -128,6 +132,13 @@ export function LoginScreen() {
             )}
           </Pressable>
         </View>
+
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => navigation.navigate('PrivacyPolicy')}
+          style={styles.privacyLink}>
+          <Text style={styles.privacyLinkText}>Privacy Policy</Text>
+        </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -235,5 +246,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  privacyLink: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  privacyLinkText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

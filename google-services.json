@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "558633174225",
+    "project_id": "docalert-production",
+    "storage_bucket": "docalert-production.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558633174225:android:8791b4bc1d8851a9b371f0",
+        "android_client_info": {
+          "package_name": "net.docalert.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeOIMEV-jpr613kSYOfrxCmi5snvJckLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

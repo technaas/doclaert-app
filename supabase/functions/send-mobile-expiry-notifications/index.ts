@@ -1,23 +1,22 @@
 // Supabase Edge Function: send-mobile-expiry-notifications
 //
-// Scheduled once daily (single cron — NOT per company). This function loops all
-// rows in email_notification_settings and applies each company's:
-//   enabled, alert_threshold_days, repeat_interval_days
+// Company-wide runs require header x-cron-secret to match MOBILE_CRON_SECRET.
+// A user JWT alone cannot start them. CRON_SECRET remains the email reminder secret.
+// One-device tests require an owner or technaas_super_admin access token and
+// { "mode": "test", "mobile_device_id": "<uuid>" }.
 //
-// Per active device: max 1 staff + 1 branch + 1 vehicle summary per repeat_interval_days.
+// Scheduled runs loop email_notification_settings and apply:
+//   enabled, alert_threshold_days, repeat_interval_days, recipient_roles
+// Recipients are limited to that company, those roles, alert permission,
+// and the user's brand/branch access.
 //
-// Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-// Production: POST {} — see supabase/scheduled/cron-send-mobile-expiry-notifications.sql
-// Manual test: POST ?test=true
-// Manual one company: POST { "company_id": "<uuid>" }
+// Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MOBILE_CRON_SECRET
 
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import {
-  countByCategory,
-  fetchAlertDocuments,
-} from "./lib/documents.ts";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { isAuthorizedCron, resolveAdministrator } from "./lib/auth.ts";
+import { countByCategory, fetchAlertDocuments } from "./lib/documents.ts";
 import { todayKuwaitYmd } from "./lib/expiry.ts";
 import { sendExpoPush } from "./lib/expo.ts";
 import {
@@ -25,11 +24,13 @@ import {
   wasSentWithinRepeatInterval,
 } from "./lib/logs.ts";
 import { buildPushMessage } from "./lib/messages.ts";
+import { countsForRecipient, loadPushRecipients } from "./lib/recipients.ts";
+import { redactSecrets } from "./lib/redact.ts";
 import {
   type CompanyNotificationSettings,
   parseCompanyNotificationSettings,
 } from "./lib/settings.ts";
-import { runTestMode } from "./lib/test.ts";
+import { runDeviceTest } from "./lib/test.ts";
 import type {
   MobileDeviceRow,
   NotificationCategory,
@@ -45,7 +46,7 @@ const corsHeaders = {
 };
 
 const SETTINGS_SELECT =
-  "company_id, enabled, alert_threshold_days, repeat_interval_days";
+  "company_id, enabled, alert_threshold_days, repeat_interval_days, recipient_roles";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -74,7 +75,7 @@ function isValidExpoToken(token: string | null | undefined): token is string {
 }
 
 async function loadCompanyLookups(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   companyId: string,
   docs: { staff_id: string | null; branch_id: string | null }[],
 ) {
@@ -136,7 +137,7 @@ async function loadCompanyLookups(
 }
 
 async function fetchActiveDevices(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   companyId: string,
 ): Promise<MobileDeviceRow[]> {
   const { data, error } = await admin
@@ -152,11 +153,11 @@ async function fetchActiveDevices(
 }
 
 async function processCompany(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   settings: CompanyNotificationSettings,
   stats: RunStats,
 ): Promise<void> {
-  const { companyId, alertThresholdDays, repeatIntervalDays } = settings;
+  const { companyId, alertThresholdDays, repeatIntervalDays, recipientRoles } = settings;
 
   console.log(
     `[mobile-expiry] company=${companyId} threshold=${alertThresholdDays}d repeat=${repeatIntervalDays}d`,
@@ -172,28 +173,19 @@ async function processCompany(
     return;
   }
 
-  await loadCompanyLookups(admin, companyId, docs);
+  const rawLookups = await loadCompanyLookups(admin, companyId, docs);
+  const lookups = {
+    staff: (rawLookups.staff as { id: string; branch_id: string | null }[]).map((row) => ({
+      id: String(row.id),
+      branch_id: row.branch_id ? String(row.branch_id) : null,
+    })),
+    branches: (rawLookups.branches as { id: string; brand_id: string | null }[]).map((row) => ({
+      id: String(row.id),
+      brand_id: row.brand_id ? String(row.brand_id) : null,
+    })),
+  };
 
   const todayYmd = todayKuwaitYmd();
-  const counts = countByCategory(docs, vehicles, alertThresholdDays, todayYmd);
-
-  const categories: {
-    key: NotificationCategory;
-    counts: typeof counts.staff;
-  }[] = [
-    { key: "staff", counts: counts.staff },
-    { key: "branch", counts: counts.branch },
-    { key: "vehicle", counts: counts.vehicle },
-  ];
-
-  const hasAlerts = categories.some((c) => c.counts.total > 0);
-  if (!hasAlerts) {
-    console.log(`[mobile-expiry] company=${companyId} no staff/branch/vehicle alerts after filter`);
-    return;
-  }
-
-  stats.companies_processed += 1;
-  stats.processed += counts.staff.total + counts.branch.total + counts.vehicle.total;
 
   const devices = await fetchActiveDevices(admin, companyId);
   if (!devices.length) {
@@ -201,13 +193,50 @@ async function processCompany(
     return;
   }
 
+  const recipients = await loadPushRecipients(
+    admin,
+    companyId,
+    devices.map((device) => device.user_id),
+    recipientRoles,
+  );
+
+  const companyCounts = countByCategory(docs, vehicles, alertThresholdDays, todayYmd);
   const jobs: SendJob[] = [];
+  let companyHasEligibleAlert = false;
 
   for (const device of devices) {
     if (!device.is_active || !isValidExpoToken(device.expo_push_token)) {
       stats.skipped++;
       continue;
     }
+
+    const recipient = recipients.get(device.user_id);
+    if (!recipient) {
+      stats.skipped++;
+      continue;
+    }
+
+    const counts = countsForRecipient(
+      recipient,
+      docs,
+      vehicles,
+      lookups,
+      alertThresholdDays,
+      todayYmd,
+    );
+    const categories: {
+      key: NotificationCategory;
+      counts: typeof counts.staff;
+    }[] = [
+      { key: "staff", counts: counts.staff },
+      { key: "branch", counts: counts.branch },
+      { key: "vehicle", counts: counts.vehicle },
+    ];
+
+    if (!categories.some((category) => category.counts.total > 0)) {
+      continue;
+    }
+    companyHasEligibleAlert = true;
 
     for (const cat of categories) {
       if (cat.counts.total <= 0) continue;
@@ -228,7 +257,7 @@ async function processCompany(
           continue;
         }
       } catch (e) {
-        stats.errors.push((e as Error).message);
+        stats.errors.push(redactSecrets((e as Error).message));
         continue;
       }
 
@@ -242,6 +271,15 @@ async function processCompany(
       });
     }
   }
+
+  if (!companyHasEligibleAlert) {
+    console.log(`[mobile-expiry] company=${companyId} no alerts for eligible recipients`);
+    return;
+  }
+
+  stats.companies_processed += 1;
+  stats.processed += companyCounts.staff.total + companyCounts.branch.total +
+    companyCounts.vehicle.total;
 
   if (!jobs.length) return;
 
@@ -274,15 +312,15 @@ async function processCompany(
           });
           stats.failed++;
           stats.errors.push(
-            `${job.category} -> ${job.device.id}: ${result.error}`,
+            redactSecrets(`${job.category} -> ${job.device.id}: ${result.error}`),
           );
         }
       } catch (e) {
-        stats.errors.push(`log(${job.category}): ${(e as Error).message}`);
+        stats.errors.push(redactSecrets(`log(${job.category}): ${(e as Error).message}`));
       }
     }
   } catch (e) {
-    const msg = (e as Error).message;
+    const msg = redactSecrets((e as Error).message);
     stats.errors.push(`expo-batch: ${msg}`);
     for (const job of jobs) {
       try {
@@ -296,7 +334,7 @@ async function processCompany(
         });
         stats.failed++;
       } catch (logErr) {
-        stats.errors.push(`log-fail: ${(logErr as Error).message}`);
+        stats.errors.push(redactSecrets(`log-fail: ${(logErr as Error).message}`));
       }
     }
   }
@@ -320,7 +358,6 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const isTestMode = url.searchParams.get("test") === "true";
 
   let payload: Record<string, unknown> = {};
   try {
@@ -328,25 +365,45 @@ serve(async (req) => {
   } catch {
     payload = {};
   }
-  const filterCompanyId = payload?.company_id
+  const requestedCompanyId = payload?.company_id
     ? String(payload.company_id)
     : url.searchParams.get("company_id")
     ? String(url.searchParams.get("company_id"))
     : null;
+  const isTestMode = payload?.mode === "test" || url.searchParams.get("test") === "true";
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
   if (isTestMode) {
-    const result = await runTestMode(admin, filterCompanyId);
-    return json(result, result.success ? 200 : 500);
+    if (payload?.mode !== "test" || !payload?.mobile_device_id) {
+      return json({
+        error: "A test requires mode, mobile_device_id, and an administrator sign-in.",
+      }, 403);
+    }
+    const administrator = await resolveAdministrator(admin, req);
+    if (!administrator.ok) {
+      return json({ error: administrator.error }, administrator.status);
+    }
+    const result = await runDeviceTest(
+      admin,
+      administrator.administrator,
+      String(payload.mobile_device_id),
+      requestedCompanyId,
+    );
+    const { httpStatus, ...body } = result;
+    return json(body, httpStatus);
+  }
+
+  if (!isAuthorizedCron(req)) {
+    return json({ error: "Unauthorized" }, 401);
   }
 
   // All companies — enabled flag checked per row (do not filter in SQL).
   let settingsQ = admin.from("email_notification_settings").select(SETTINGS_SELECT);
-  if (filterCompanyId) {
-    settingsQ = settingsQ.eq("company_id", filterCompanyId);
+  if (requestedCompanyId) {
+    settingsQ = settingsQ.eq("company_id", requestedCompanyId);
   }
 
   const { data: settingsRows, error: setErr } = await settingsQ;
@@ -376,7 +433,7 @@ serve(async (req) => {
     try {
       await processCompany(admin, settings, stats);
     } catch (e) {
-      stats.errors.push((e as Error).message);
+      stats.errors.push(redactSecrets((e as Error).message));
     }
   }
 

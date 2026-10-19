@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { redactSecrets } from "./redact.ts";
 import type { MobileDeviceRow, NotificationCategory } from "./types.ts";
 
-/**
- * mobile_notification_logs.check currently allows staff | branch | test.
- * Vehicle Daftar pushes are logged as branch until that constraint is widened.
- */
-function logTypeForCategory(category: NotificationCategory): "staff" | "branch" | "test" {
-  if (category === "vehicle") return "branch";
+function logTypeForCategory(
+  category: NotificationCategory,
+): "staff" | "branch" | "vehicle" | "test" {
+  if (category === "vehicle") return "vehicle";
   if (category === "test") return "test";
-  return category;
+  if (category === "branch") return "branch";
+  return "staff";
 }
 
 /**
@@ -62,7 +62,7 @@ export async function insertNotificationLog(
     status: params.status,
     device_name: params.device.device_name,
     platform: params.device.platform,
-    error: params.error ?? null,
+    error: params.error ? redactSecrets(params.error) : null,
     expo_ticket_id: params.expoTicketId ?? null,
   });
 

@@ -6,7 +6,7 @@ export async function fetchCompanySubscription(
 ): Promise<SubscriptionRecord | null> {
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('status,end_date')
+    .select('status,end_date,plan_name')
     .eq('company_id', companyId)
     .order('end_date', { ascending: false })
     .limit(1)

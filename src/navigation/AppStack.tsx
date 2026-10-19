@@ -15,6 +15,8 @@ import { VehicleDetailScreen } from '@/src/screens/vehicles/VehicleDetailScreen'
 import { PermissionDenied } from '@/src/components/access/PermissionDenied';
 import type { VehiclesStackParamList } from '@/src/navigation/VehiclesStack';
 import { VehiclesStack } from '@/src/navigation/VehiclesStack';
+import { HelpSupportScreen } from '@/src/screens/support/HelpSupportScreen';
+import { PrivacyPolicyScreen } from '@/src/screens/support/PrivacyPolicyScreen';
 
 export type AppStackParamList = {
   MainTabs: undefined;
@@ -32,6 +34,8 @@ export type AppStackParamList = {
   VehicleDetail: { vehicleId: string };
   Vehicles: NavigatorScreenParams<VehiclesStackParamList> | undefined;
   AccessDenied: undefined;
+  PrivacyPolicy: undefined;
+  HelpSupport: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -117,6 +121,16 @@ export function AppStack() {
         options={{ title: 'Access denied' }}>
         {() => <PermissionDenied />}
       </Stack.Screen>
+      <Stack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+        options={{ title: 'Privacy Policy' }}
+      />
+      <Stack.Screen
+        name="HelpSupport"
+        component={HelpSupportScreen}
+        options={{ title: 'Help & Support' }}
+      />
     </Stack.Navigator>
   );
 }

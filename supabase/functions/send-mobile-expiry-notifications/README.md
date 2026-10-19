@@ -1,46 +1,37 @@
 # send-mobile-expiry-notifications
 
-Expo push summaries for expiring / expired documents.
+Expo push summaries for expiring and expired documents. Email and WhatsApp stay in `send-expiry-email-reminders`.
 
-## Scheduling (production)
+## Authorization
 
-**One daily cron only** — not per company.
+Company-wide runs require the `x-cron-secret` header to match the `MOBILE_CRON_SECRET` function secret. A missing, empty, or incorrect value is rejected. `CRON_SECRET` remains the email and WhatsApp reminder secret and does not authorize this function. A signed-in user cannot start a company-wide run.
 
-See [`supabase/scheduled/cron-send-mobile-expiry-notifications.sql`](../../scheduled/cron-send-mobile-expiry-notifications.sql):
+A one-device test requires:
 
-- **08:00 Asia/Kuwait** daily
-- pg_cron UTC expression: `0 5 * * *`
-- POST `{}` to this function with the service role key
+- `Authorization: Bearer <access token>` for an active `owner` or `technaas_super_admin`
+- JSON body `{ "mode": "test", "mobile_device_id": "<uuid>" }`
 
-## Per-company settings
+An owner can test only a device in their own company. A Technaas super admin testing another company must also send that `company_id`. The test writes `notification_type = test` and does not start the staff, branch, or vehicle cooldown. Responses and logs do not include the push token.
 
-Read from `email_notification_settings` for each `company_id`:
+`?test=true` no longer sends anything.
+
+## Recipients
+
+For each company, the function reads `email_notification_settings`:
 
 | Column | Use |
 |--------|-----|
-| `enabled` | `false` → skip company |
-| `alert_threshold_days` | Documents with `expiry_date <= today + threshold` (includes expired) |
-| `repeat_interval_days` | Min days between staff/branch summary per device |
+| `enabled` | `false` skips the company for push and does not change email |
+| `alert_threshold_days` | Same window used by email |
+| `repeat_interval_days` | Minimum days between successful pushes of one category to one device |
+| `recipient_roles` | Only active users in these roles, registered to this company, can receive push |
 
-## Limits
+Each eligible user must also have expiry-alert permission. Staff, branch, and vehicle counts are then limited to that user's brand and branch access. Custom email addresses are not push recipients.
 
-Per active device per run (subject to repeat interval):
+## Logs
 
-- 1 Staff Documents summary
-- 1 Branch Licenses summary
+`staff`, `branch`, and `vehicle` have separate cooldown rows. The production check constraint allows `staff`, `branch`, `vehicle`, and `test`.
 
-Deduped via `mobile_notification_logs` + `repeat_interval_days`.
+## Scheduling
 
-## Manual invoke
-
-```http
-POST /functions/v1/send-mobile-expiry-notifications
-Authorization: Bearer <SERVICE_ROLE_KEY>
-Content-Type: application/json
-
-{}
-```
-
-Test push: `?test=true`
-
-Single company: `{ "company_id": "<uuid>" }`
+The prepared daily job is `send-mobile-expiry-notifications-daily` at `0 7 * * *` (10:00 Asia/Kuwait). Its command reads `MOBILE_CRON_SECRET` from Supabase Vault when it runs. Do not execute `supabase/scheduled/cron-send-mobile-expiry-notifications.sql` until that secret exists in both the Edge Function secrets and Vault, and this version of the function is deployed. The SQL file contains no secret value.

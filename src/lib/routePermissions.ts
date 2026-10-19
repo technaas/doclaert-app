@@ -45,6 +45,8 @@ export function canAccessAppRoute(
     case 'VehicleDetail':
       return canViewVehicles(role);
     case 'MainTabs':
+    case 'PrivacyPolicy':
+    case 'HelpSupport':
       return true;
     default:
       return true;

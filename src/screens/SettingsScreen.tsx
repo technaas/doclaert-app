@@ -1,89 +1,34 @@
-import Constants from 'expo-constants';
-import { useRef, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { AppScreenLayout } from '@/src/components/layout/AppScreenLayout';
-import {
-  MobileNotificationLogsSection,
-  type MobileNotificationLogsSectionHandle,
-} from '@/src/components/settings/MobileNotificationLogsSection';
 import { useAuth } from '@/src/context/AuthContext';
-import { useNotifications } from '@/src/context/NotificationContext';
 import { cardStyle, colors, radius, spacing, typography } from '@/src/constants/theme';
 import { useCompanyProfile } from '@/src/hooks/useCompanyProfile';
 import { useSubscriptionGate } from '@/src/hooks/useSubscriptionGate';
-import { isTechnicalPushMessage, PUSH_USER_SYNC_FAILED } from '@/src/lib/pushAvailability';
+import type { AppStackParamList } from '@/src/navigation/AppStack';
 import { displayField } from '@/src/lib/staffDisplay';
-import type { NotificationPermissionStatus } from '@/src/types/notifications';
-
-function formatPermissionStatus(status: NotificationPermissionStatus): string {
-  switch (status) {
-    case 'granted':
-      return 'Granted';
-    case 'denied':
-      return 'Denied';
-    case 'unavailable':
-      return 'Unavailable';
-    default:
-      return 'Not determined';
-  }
-}
-
-function formatPushStatus(pushEnabled: boolean, permissionStatus: NotificationPermissionStatus) {
-  if (pushEnabled) return 'Enabled';
-  if (permissionStatus === 'denied') return 'Disabled (permission denied)';
-  if (permissionStatus === 'unavailable') return 'Unavailable on this device';
-  return 'Not enabled';
-}
-
-function formatSyncStatus(
-  syncStatus: string,
-  lastSyncedAt: string | null,
-  lastSyncError: string | null,
-): string {
-  if (syncStatus === 'syncing') return 'Syncing…';
-  if (syncStatus === 'success' && lastSyncedAt) {
-    return `Last synced ${new Date(lastSyncedAt).toLocaleString()}`;
-  }
-  if (syncStatus === 'error') {
-    if (lastSyncError && !isTechnicalPushMessage(lastSyncError)) {
-      return lastSyncError;
-    }
-    return PUSH_USER_SYNC_FAILED;
-  }
-  return 'Not synced yet';
-}
+import { formatSubscriptionEnd } from '@/src/lib/subscription';
 
 function SettingsRow({
   label,
   value,
-  valueTone,
 }: {
   label: string;
   value: string;
-  valueTone?: 'default' | 'success' | 'muted' | 'danger';
 }) {
-  const valueStyle =
-    valueTone === 'success'
-      ? styles.valueSuccess
-      : valueTone === 'danger'
-        ? styles.valueDanger
-        : valueTone === 'muted'
-          ? styles.valueMuted
-          : styles.value;
-
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[valueStyle, styles.rowValue]} numberOfLines={3}>
+      <Text style={[styles.value, styles.rowValue]} numberOfLines={3}>
         {value}
       </Text>
     </View>
@@ -95,27 +40,10 @@ export function SettingsScreen() {
   const companyId = profile?.company_id ?? undefined;
   const { profile: companyProfile, loading: companyLoading } = useCompanyProfile(companyId);
   const subscription = useSubscriptionGate(companyId, Boolean(companyId));
-  const {
-    permissionStatus,
-    pushEnabled,
-    syncStatus,
-    lastSyncedAt,
-    lastSyncError,
-    permissionMessage,
-    devicePlatform,
-    isRegistering,
-    retryTokenSync,
-    testPushRegistration,
-  } = useNotifications();
-
-  const appVersion =
-    Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '1.0.0';
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pushActionLoading, setPushActionLoading] = useState(false);
-  const [logsRefreshing, setLogsRefreshing] = useState(false);
-  const notificationLogsRef = useRef<MobileNotificationLogsSectionHandle>(null);
 
   const handleLogout = async () => {
     setError(null);
@@ -129,58 +57,9 @@ export function SettingsScreen() {
     }
   };
 
-  const handleRetrySync = async () => {
-    setPushActionLoading(true);
-    try {
-      await retryTokenSync();
-    } finally {
-      setPushActionLoading(false);
-    }
-  };
-
-  const handleTestPushRegistration = async () => {
-    setPushActionLoading(true);
-    try {
-      const result = await testPushRegistration();
-      Alert.alert(
-        result.success ? 'Push alerts' : 'Push alerts unavailable',
-        result.success
-          ? 'Push alerts are set up on this device.'
-          : result.message,
-      );
-    } finally {
-      setPushActionLoading(false);
-    }
-  };
-
-  const showPlaceholder = (title: string) => {
-    Alert.alert(title, 'This link will be available in a future update.');
-  };
-
-  const pushStatusLabel = formatPushStatus(pushEnabled, permissionStatus);
-
-  const handleRefreshLogs = async () => {
-    setLogsRefreshing(true);
-    try {
-      await notificationLogsRef.current?.refresh();
-    } finally {
-      setLogsRefreshing(false);
-    }
-  };
-
   return (
     <AppScreenLayout title="Settings" subtitle="Account & app preferences" showBell={false}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={logsRefreshing}
-            onRefresh={() => void handleRefreshLogs()}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Company</Text>
           <Text style={styles.sectionHint}>Read-only company details</Text>
@@ -243,67 +122,25 @@ export function SettingsScreen() {
             value={subscription.subscription?.status ?? '—'}
           />
           <SettingsRow
+            label="Plan"
+            value={subscription.subscription?.plan_name?.trim() || '—'}
+          />
+          <SettingsRow
             label="Subscription end"
-            value={subscription.subscription?.end_date ?? '—'}
+            value={formatSubscriptionEnd(subscription.subscription)}
           />
-          <SettingsRow label="App version" value={appVersion} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Push notifications</Text>
-          <SettingsRow
-            label="Status"
-            value={pushStatusLabel}
-            valueTone={pushEnabled ? 'success' : permissionStatus === 'denied' ? 'danger' : 'muted'}
-          />
-          <SettingsRow
-            label="Permission"
-            value={formatPermissionStatus(permissionStatus)}
-          />
-          <SettingsRow
-            label="Token sync"
-            value={formatSyncStatus(syncStatus, lastSyncedAt, lastSyncError)}
-          />
-          {devicePlatform ? (
-            <SettingsRow label="Device platform" value={devicePlatform} />
-          ) : null}
-          {permissionMessage ? (
-            <Text style={styles.hint}>{permissionMessage}</Text>
-          ) : null}
-
-          <Pressable
-            style={[styles.secondaryButton, pushActionLoading && styles.buttonDisabled]}
-            onPress={() => void handleRetrySync()}
-            disabled={pushActionLoading || isRegistering}>
-            {pushActionLoading ? (
-              <ActivityIndicator color={colors.primary} size="small" />
-            ) : (
-              <Text style={styles.secondaryButtonText}>Retry notification sync</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[styles.testButton, pushActionLoading && styles.buttonDisabled]}
-            onPress={() => void handleTestPushRegistration()}
-            disabled={pushActionLoading || isRegistering}>
-            <Text style={styles.testButtonText}>Test Push Registration</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.card}>
-          <MobileNotificationLogsSection ref={notificationLogsRef} companyId={companyId} />
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Support</Text>
           <Pressable
             style={styles.linkButton}
-            onPress={() => showPlaceholder('Privacy Policy')}>
+            onPress={() => navigation.navigate('PrivacyPolicy')}>
             <Text style={styles.linkButtonText}>Privacy policy</Text>
           </Pressable>
           <Pressable
             style={styles.linkButton}
-            onPress={() => showPlaceholder('Help & Support')}>
+            onPress={() => navigation.navigate('HelpSupport')}>
             <Text style={styles.linkButtonText}>Help & support</Text>
           </Pressable>
         </View>
@@ -370,59 +207,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
-  },
-  valueSuccess: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.success,
-  },
-  valueDanger: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.danger,
-  },
-  valueMuted: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  hint: {
-    marginTop: spacing.sm,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.textMuted,
-  },
-  secondaryButton: {
-    marginTop: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  testButton: {
-    marginTop: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.primaryMuted,
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
   },
   linkButton: {
     paddingVertical: spacing.md,
