@@ -1,11 +1,8 @@
 import {
-  DOCALERT_WEBSITE_URL,
+  FALLBACK_SUPPORT_CONTACTS,
   PRIVACY_POLICY_URL,
-  SUPPORT_EMAIL_DISPLAY,
-  SUPPORT_EMAIL_URL,
-  SUPPORT_PHONE_DISPLAY,
-  SUPPORT_PHONE_URL,
-  SUPPORT_WHATSAPP_URL,
+  resolveSupportContactView,
+  type SupportContactView,
 } from '@/src/lib/supportContacts';
 
 export const PRIVACY_POLICY_EFFECTIVE_DATE = '18 October 2026';
@@ -21,24 +18,58 @@ export type PrivacySection = {
   paragraphs: string[];
 };
 
-export const privacyPolicyIntroLinks: PrivacyLink[] = [
-  {
-    label: DOCALERT_WEBSITE_URL,
-    url: DOCALERT_WEBSITE_URL,
-    unavailableMessage: 'No browser is available to open the DocAlert website.',
-  },
-  {
-    label: SUPPORT_EMAIL_DISPLAY,
-    url: SUPPORT_EMAIL_URL,
-    unavailableMessage: 'No email app is available on this device.',
-  },
-];
-
+/** Separately designated privacy/legal policy URL — not remote-managed. */
 export const privacyPolicyWebLink: PrivacyLink = {
   label: PRIVACY_POLICY_URL,
   url: PRIVACY_POLICY_URL,
   unavailableMessage: 'No browser is available to open the privacy policy page.',
 };
+
+export function buildPrivacyPolicyIntroLinks(view: SupportContactView): PrivacyLink[] {
+  return [
+    {
+      label: view.websiteDisplay,
+      url: view.websiteUrl,
+      unavailableMessage: 'No browser is available to open the DocAlert website.',
+    },
+    {
+      label: view.emailDisplay,
+      url: view.emailUrl,
+      unavailableMessage: 'No email app is available on this device.',
+    },
+  ];
+}
+
+export function buildPrivacyPolicyContacts(view: SupportContactView): PrivacyLink[] {
+  return [
+    {
+      label: `Email: ${view.emailDisplay}`,
+      url: view.emailUrl,
+      unavailableMessage: 'No email app is available on this device.',
+    },
+    {
+      label: `Phone: ${view.callDisplay}`,
+      url: view.callUrl,
+      unavailableMessage: 'No phone app is available on this device.',
+    },
+    {
+      label: `WhatsApp: ${view.whatsappDisplay}`,
+      url: view.whatsappUrl,
+      unavailableMessage: 'WhatsApp could not be opened on this device.',
+    },
+    {
+      label: `Website: ${view.websiteDisplay}`,
+      url: view.websiteUrl,
+      unavailableMessage: 'No browser is available to open the DocAlert website.',
+    },
+  ];
+}
+
+const fallbackView = resolveSupportContactView(FALLBACK_SUPPORT_CONTACTS);
+
+/** Fallback static links (hardcoded constants) for non-reactive imports. */
+export const privacyPolicyIntroLinks = buildPrivacyPolicyIntroLinks(fallbackView);
+export const privacyPolicyContacts = buildPrivacyPolicyContacts(fallbackView);
 
 export const privacyPolicySections: PrivacySection[] = [
   {
@@ -145,28 +176,5 @@ export const privacyPolicySections: PrivacySection[] = [
       'Technaas Solutions may update this Privacy Policy to reflect changes in DocAlert services, technology, legal requirements, or data processing practices.',
       'The revised policy will display its updated effective date.',
     ],
-  },
-];
-
-export const privacyPolicyContacts: PrivacyLink[] = [
-  {
-    label: `Email: ${SUPPORT_EMAIL_DISPLAY}`,
-    url: SUPPORT_EMAIL_URL,
-    unavailableMessage: 'No email app is available on this device.',
-  },
-  {
-    label: `Phone: ${SUPPORT_PHONE_DISPLAY}`,
-    url: SUPPORT_PHONE_URL,
-    unavailableMessage: 'No phone app is available on this device.',
-  },
-  {
-    label: `WhatsApp: ${SUPPORT_PHONE_DISPLAY}`,
-    url: SUPPORT_WHATSAPP_URL,
-    unavailableMessage: 'WhatsApp could not be opened on this device.',
-  },
-  {
-    label: `Website: ${DOCALERT_WEBSITE_URL}`,
-    url: DOCALERT_WEBSITE_URL,
-    unavailableMessage: 'No browser is available to open the DocAlert website.',
   },
 ];

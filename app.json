@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "net.docalert.app",
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/ios-icon.png",
       "config": {
         "usesNonExemptEncryption": false
       }

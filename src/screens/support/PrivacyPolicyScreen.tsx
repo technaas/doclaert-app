@@ -2,14 +2,15 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  privacyPolicyContacts,
-  privacyPolicyIntroLinks,
+  buildPrivacyPolicyContacts,
+  buildPrivacyPolicyIntroLinks,
   privacyPolicySections,
   privacyPolicyWebLink,
   PRIVACY_POLICY_EFFECTIVE_DATE,
   type PrivacyLink,
 } from '@/src/content/privacyPolicy';
 import { colors, spacing, typography } from '@/src/constants/theme';
+import { useSupportContacts } from '@/src/hooks/useSupportContacts';
 import { openExternalUrl } from '@/src/lib/openExternalUrl';
 
 function ContactLink({ link }: { link: PrivacyLink }) {
@@ -24,7 +25,9 @@ function ContactLink({ link }: { link: PrivacyLink }) {
 }
 
 export function PrivacyPolicyScreen() {
-  const [websiteLink, emailLink] = privacyPolicyIntroLinks;
+  const { view } = useSupportContacts();
+  const [websiteLink, emailLink] = buildPrivacyPolicyIntroLinks(view);
+  const contacts = buildPrivacyPolicyContacts(view);
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -63,7 +66,7 @@ export function PrivacyPolicyScreen() {
             requests, contact:
           </Text>
           <Text style={styles.paragraph}>Technaas Solutions</Text>
-          {privacyPolicyContacts.map((link) => (
+          {contacts.map((link) => (
             <ContactLink key={link.label} link={link} />
           ))}
         </View>
