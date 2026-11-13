@@ -2,7 +2,7 @@
   "expo": {
     "name": "DocAlert",
     "slug": "docalert-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "docalert",
@@ -10,6 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
+      "buildNumber": "4",
       "bundleIdentifier": "net.docalert.app",
       "icon": "./assets/images/ios-icon.png",
       "config": {
